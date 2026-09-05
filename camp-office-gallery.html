@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Camp Office Gallery</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@400;700&family=Merriweather:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
+<style>
+  :root{
+    --navy:#1F4E78;
+    --navy-dark:#153A5B;
+    --navy-tint:#EAF0F5;
+    --amber:#B8860B;
+    --amber-tint:#FBF3DF;
+    --bg:#F4F3EF;
+    --surface:#FFFFFF;
+    --border:#DBD7CE;
+    --border-strong:#BEC7CE;
+    --text:#22303C;
+    --muted:#5B6B76;
+    --danger:#B3261E;
+    --danger-tint:#FBEAE9;
+    --success:#2F7D4F;
+    --success-tint:#EAF4EE;
+    --radius:8px;
+    --shadow:0 1px 2px rgba(21,58,91,0.08), 0 1px 1px rgba(21,58,91,0.04);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:"Segoe UI", system-ui, -apple-system, "Noto Sans", Arial, sans-serif;
+    font-size:14px;
+    line-height:1.45;
+  }
+  h1,h2,h3{font-family:Georgia,"Times New Roman",serif;font-weight:700;margin:0;color:var(--navy-dark);}
+  body.lang-ur label, body.lang-ur h1, body.lang-ur h2, body.lang-ur h3, body.lang-ur .btn,
+  body.lang-ur button, body.lang-ur .field-hint, body.lang-ur .auth-sub, body.lang-ur .auth-warn,
+  body.lang-ur .guest-banner, body.lang-ur .gphoto .meta, body.lang-ur .modal h3, body.lang-ur th{
+    font-family:"Noto Nastaliq Urdu","Jameel Noori Nastaleeq","Noto Naskh Arabic",Tahoma,Arial,sans-serif;
+  }
+
+  /* ---------- Top bar ---------- */
+  .topbar{
+    background:linear-gradient(180deg,var(--navy) 0%, var(--navy-dark) 100%);
+    color:#fff;padding:18px 24px;display:flex;flex-wrap:wrap;align-items:center;
+    justify-content:space-between;gap:12px;border-bottom:3px solid var(--amber);
+  }
+  .topbar h1{color:#fff;font-size:20px;letter-spacing:.2px;}
+  .topbar .sub{color:#CFE0EC;font-size:12.5px;margin-top:2px;}
+  .userbar{display:flex;align-items:center;gap:10px;color:#fff;font-size:13px;flex-wrap:wrap;}
+  .userbar .role-chip{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.35);border-radius:20px;padding:3px 12px;font-size:12px;}
+  select#uiLangSelect{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:6px;padding:5px 8px;font-size:12.5px;}
+  select#uiLangSelect option{color:#111;}
+
+  main{max-width:1200px;margin:0 auto;padding:20px 24px 60px;}
+
+  .guest-banner{display:none;background:var(--amber-tint);color:#7a5a00;border:1px solid var(--amber);border-radius:var(--radius);padding:12px 16px;margin-bottom:18px;font-size:13.5px;}
+  body.guest-mode .guest-banner{display:block;}
+
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:18px;}
+  .count-chip{background:var(--navy-tint);color:var(--navy-dark);border-radius:20px;padding:5px 14px;font-size:12.5px;}
+
+  button.btn{
+    background:var(--navy);color:#fff;border:none;border-radius:var(--radius);
+    padding:9px 18px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;
+  }
+  button.btn:hover{background:var(--navy-dark);}
+  button.btn.ghost{background:transparent;color:var(--navy);border:1px solid var(--border-strong);}
+  button.btn.ghost:hover{background:var(--navy-tint);}
+  button.btn.danger{background:var(--danger);}
+  button.btn.danger:hover{background:#8f1e18;}
+  button.btn:disabled{opacity:.5;cursor:not-allowed;}
+  button.btn.small{padding:5px 12px;font-size:12px;}
+
+  .field{margin-bottom:14px;}
+  .field label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:4px;}
+  .field input,.field select,.field textarea{
+    width:100%;padding:9px 11px;border:1px solid var(--border-strong);border-radius:var(--radius);
+    font-size:14px;font-family:inherit;box-sizing:border-box;
+  }
+  .field-hint{font-size:12px;color:var(--muted);margin-top:4px;}
+
+  /* ---------- Auth screens ---------- */
+  .fullscreen-overlay{position:fixed;inset:0;background:linear-gradient(160deg,var(--navy) 0%, var(--navy-dark) 100%);display:flex;align-items:center;justify-content:center;z-index:500;padding:20px;}
+  .auth-card{background:var(--surface);border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.35);padding:32px 30px;width:100%;max-width:400px;}
+  .auth-sub{font-size:13px;color:var(--muted);margin:6px 0 18px;line-height:1.7;}
+  .auth-error{color:var(--danger);font-size:12.5px;min-height:16px;margin-top:6px;}
+  .auth-warn{margin-top:16px;font-size:12px;color:var(--muted);background:var(--navy-tint);padding:10px 12px;border-radius:var(--radius);line-height:1.7;}
+
+  /* ---------- Gallery grid ---------- */
+  .gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:16px;}
+  .gphoto{position:relative;border-radius:var(--radius);overflow:hidden;aspect-ratio:1/1;background:#dfe3e6;cursor:pointer;box-shadow:var(--shadow);border:1px solid var(--border);}
+  .gphoto img{width:100%;height:100%;object-fit:cover;display:block;}
+  .gphoto .meta{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(transparent,rgba(10,20,30,.82));color:#fff;padding:20px 9px 7px;font-size:11px;line-height:1.5;}
+  .gphoto .meta b{display:block;font-size:12px;}
+  .gphoto .del-btn{position:absolute;top:6px;right:6px;background:rgba(179,38,30,.88);color:#fff;border:none;border-radius:50%;width:26px;height:26px;cursor:pointer;font-size:14px;line-height:1;display:none;}
+  .gphoto:hover .del-btn{display:block;}
+  .empty-state{text-align:center;color:var(--muted);padding:60px 20px;font-size:14px;}
+
+  /* ---------- Modals ---------- */
+  .modal-overlay{position:fixed;inset:0;background:rgba(10,20,30,.6);display:none;align-items:center;justify-content:center;z-index:900;padding:20px;}
+  .modal-overlay.show{display:flex;}
+  .modal{background:#fff;border-radius:12px;padding:26px 28px;max-width:460px;width:100%;max-height:86vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.35);}
+  .modal.wide{max-width:900px;}
+  .modal h3{margin-bottom:14px;font-size:17px;}
+  .modal .actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;}
+  .viewer-img{max-width:100%;max-height:70vh;display:block;margin:0 auto 14px;border-radius:6px;}
+  .viewer-meta{font-size:13px;color:var(--muted);text-align:center;line-height:1.7;}
+
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th,td{padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;}
+  th{color:var(--muted);font-weight:600;font-size:12px;}
+  .role-select{padding:5px 8px;border-radius:6px;border:1px solid var(--border-strong);font-size:12.5px;}
+
+  footer.appfoot{text-align:center;color:var(--muted);font-size:11.5px;padding:18px;border-top:1px solid var(--border);}
+  .toast{position:fixed;bottom:20px;right:20px;background:var(--navy-dark);color:#fff;padding:11px 18px;border-radius:var(--radius);box-shadow:0 4px 14px rgba(0,0,0,.25);font-size:13px;z-index:999;opacity:0;transform:translateY(8px);transition:.25s;pointer-events:none;max-width:340px;}
+  .toast.show{opacity:1;transform:translateY(0);}
+</style>
+</head>
+<body>
+
+<!-- ================= AUTH: FIRST-RUN SETUP ================= -->
+<div class="fullscreen-overlay auth-screen" id="authSetupScreen" style="display:none;">
+  <div class="auth-card">
+    <h2 data-i18n="auth_createAccount">Create your account</h2>
+    <div class="auth-sub" data-i18n="auth_newAccountsNote">New accounts start as "Pending" (view-only). An existing Administrator must approve you afterwards before you can upload photos.</div>
+    <div class="field"><label data-i18n="lbl_name">Full name</label><input type="text" id="setup_name" placeholder="e.g. Iftikhar Ahmed"></div>
+    <div class="field"><label data-i18n="lbl_designation">Designation</label><input type="text" id="setup_designation" placeholder="e.g. Junior Clerk, Camp Office Prosecutor General Punjab"></div>
+    <div class="field"><label data-i18n="lbl_mobile">Mobile number</label><input type="tel" id="setup_mobile" placeholder="e.g. 0300-1234567"></div>
+    <div class="field"><label data-i18n="lbl_cnic">CNIC number</label><input type="text" id="setup_cnic" placeholder="e.g. 12345-1234567-1"></div>
+    <div class="field"><label data-i18n="auth_yourEmail">Your email</label><input type="email" id="setup_username" placeholder="e.g. name@example.com"></div>
+    <div class="field"><label data-i18n="auth_password">Password</label><input type="password" id="setup_password"></div>
+    <div class="field"><label data-i18n="auth_confirmPassword">Confirm password</label><input type="password" id="setup_password2"></div>
+    <button class="btn" id="setupBtn" style="width:100%;" data-i18n="auth_createAccountBtn">Create account</button>
+    <div class="auth-error" id="setupError"></div>
+    <button class="btn ghost" id="backToLoginBtn" style="width:100%;margin-top:10px;" data-i18n="auth_backToSignin">Back to sign in</button>
+    <div class="auth-warn" data-i18n="auth_warnText">Photos and profile data are stored online in this system's shared Firebase database, visible only to signed-in staff.</div>
+  </div>
+</div>
+
+<!-- ================= AUTH: LOGIN ================= -->
+<div class="fullscreen-overlay auth-screen" id="authLoginScreen" style="display:none;">
+  <div class="auth-card">
+    <h2 data-i18n="auth_signin">Sign in</h2>
+    <div class="auth-sub" data-i18n="app_subtitle">Camp Office Gallery &amp; Staff Directory</div>
+    <div class="field"><label data-i18n="auth_email">Email</label><input type="email" id="login_username"></div>
+    <div class="field"><label data-i18n="auth_password">Password</label><input type="password" id="login_password"></div>
+    <button class="btn" id="loginBtn" style="width:100%;" data-i18n="auth_signin">Sign in</button>
+    <div class="auth-error" id="loginError"></div>
+    <button class="btn ghost" id="goToSignupBtn" style="width:100%;margin-top:10px;" data-i18n="auth_createNewAccount">Create a new account</button>
+  </div>
+</div>
+
+<!-- ================= MAIN APP ================= -->
+<div id="appMain" style="display:none;">
+  <div class="topbar">
+    <div>
+      <h1 data-i18n="app_title">Camp Office Gallery</h1>
+      <div class="sub" data-i18n="app_subtitle2">Camp Office Prosecutor General Punjab, Supreme Court of Pakistan, Islamabad</div>
+    </div>
+    <div class="userbar">
+      <select id="uiLangSelect"><option value="en">English</option><option value="ur">اردو</option></select>
+      <span id="whoAmI"></span>
+      <span class="role-chip" id="roleChip"></span>
+      <button class="btn ghost small" id="signOutBtn" data-i18n="btn_signout" style="color:#fff;border-color:rgba(255,255,255,.5);">Sign out</button>
+    </div>
+  </div>
+
+  <main>
+    <div class="guest-banner" id="pendingBanner" data-i18n="guest_pendingNote">Your account is pending approval by an Administrator. You can view the gallery, but cannot upload photos yet.</div>
+
+    <div class="toolbar">
+      <button class="btn" id="uploadOpenBtn" data-i18n="btn_uploadPhoto">Upload photo</button>
+      <button class="btn ghost" id="adminPanelBtn" style="display:none;" data-i18n="btn_manageUsers">Manage users</button>
+      <span class="count-chip" id="photoCountChip"></span>
+    </div>
+
+    <div class="gallery-grid" id="galleryGrid"></div>
+    <div class="empty-state" id="emptyState" style="display:none;" data-i18n="gallery_empty">No photos yet — be the first to upload one.</div>
+  </main>
+
+  <footer class="appfoot" data-i18n="app_footer">Camp Office Gallery — every photo records who uploaded it and when.</footer>
+</div>
+
+<!-- ================= UPLOAD MODAL ================= -->
+<div class="modal-overlay" id="uploadModal">
+  <div class="modal">
+    <h3 data-i18n="upload_title">Upload a photo</h3>
+    <div class="field"><label data-i18n="upload_pickFile">Choose image</label><input type="file" id="uploadFileInput" accept="image/*"></div>
+    <div class="field"><label data-i18n="upload_caption">Caption (optional)</label><input type="text" id="uploadCaption" placeholder="e.g. Office annual function, 2026"></div>
+    <div class="field-hint" id="uploadProgressHint"></div>
+    <div class="actions">
+      <button class="btn ghost" id="uploadCancelBtn" data-i18n="btn_cancel">Cancel</button>
+      <button class="btn" id="uploadConfirmBtn" data-i18n="btn_upload">Upload</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= VIEWER MODAL ================= -->
+<div class="modal-overlay" id="viewerModal">
+  <div class="modal wide">
+    <img class="viewer-img" id="viewerImg" src="" alt="">
+    <div class="viewer-meta" id="viewerMeta"></div>
+    <div class="actions">
+      <button class="btn ghost" id="viewerCloseBtn" data-i18n="btn_close">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= ADMIN: MANAGE USERS MODAL ================= -->
+<div class="modal-overlay" id="adminModal">
+  <div class="modal wide">
+    <h3 data-i18n="admin_manageUsersTitle">Manage staff accounts</h3>
+    <div class="field-hint" data-i18n="admin_manageUsersHint" style="margin-bottom:12px;">Approve pending accounts, or change a staff member's role. "Guest" = view only, "Staff" = can upload/delete own photos, "Administrator" = full control.</div>
+    <div style="overflow-x:auto;overflow-y:auto;max-height:50vh;max-width:100%;">
+      <table>
+        <thead><tr>
+          <th data-i18n="th_name">Name</th><th data-i18n="th_designation">Designation</th>
+          <th data-i18n="th_mobile">Mobile</th><th data-i18n="th_cnic">CNIC</th>
+          <th data-i18n="th_email">Email</th><th data-i18n="th_role">Role</th><th></th>
+        </tr></thead>
+        <tbody id="adminUsersBody"></tbody>
+      </table>
+    </div>
+    <div class="actions">
+      <button class="btn ghost" id="adminCloseBtn" data-i18n="btn_close">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* =====================================================================
+   FIREBASE CONFIG — replace with your own project's config values
+   (Firebase Console -> Project settings -> General -> Your apps -> SDK
+   setup and configuration). This project needs Authentication (Email/
+   Password), Firestore Database, and Storage all enabled.
+   ===================================================================== */
+var firebaseConfig = {
+  apiKey: "AIzaSyAS2-9dq8OBKMRBXpije1hBNIT1ejaika8",
+  authDomain: "camp-office-gallery.firebaseapp.com",
+  projectId: "camp-office-gallery",
+  storageBucket: "camp-office-gallery.firebasestorage.app",
+  messagingSenderId: "5103826500",
+  appId: "1:5103826500:web:8eddcd0665d70eef86266c891"
+};
+firebase.initializeApp(firebaseConfig);
+var auth = firebase.auth();
+var db = firebase.firestore();
+var storage = firebase.storage();
+
+var CURRENT_USER = null; // {uid,email,name,designation,role,photoURL}
+var galleryUnsub = null;
+var GALLERY_ITEMS = [];
+
+function toast(msg){
+  var el = document.getElementById("toast");
+  el.textContent = msg;
+  el.classList.add("show");
+  clearTimeout(el._t);
+  el._t = setTimeout(function(){ el.classList.remove("show"); }, 3200);
+}
+function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g, function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c];}); }
+function fmtDate(ts){
+  if(!ts) return "";
+  var d = ts.toDate? ts.toDate() : new Date(ts);
+  return d.toLocaleDateString(undefined,{year:"numeric",month:"short",day:"numeric"}) + " " +
+         d.toLocaleTimeString(undefined,{hour:"2-digit",minute:"2-digit"});
+}
+
+/* ---------------- i18n ---------------- */
+var UI_LANG_STORAGE_KEY = "campgallery_ui_lang";
+var I18N_UI = {
+  en: {
+    auth_createAccount:"Create your account",
+    auth_newAccountsNote:'New accounts start as "Pending" (view-only). An existing Administrator must approve you afterwards before you can upload photos.',
+    lbl_name:"Full name", lbl_designation:"Designation",
+    auth_yourEmail:"Your email", auth_password:"Password", auth_confirmPassword:"Confirm password",
+    auth_createAccountBtn:"Create account", auth_backToSignin:"Back to sign in",
+    auth_warnText:"Photos and profile data are stored online in this system's shared Firebase database, visible only to signed-in staff.",
+    auth_signin:"Sign in", app_subtitle:"Camp Office Gallery & Staff Directory",
+    auth_email:"Email", auth_createNewAccount:"Create a new account",
+    app_title:"Camp Office Gallery",
+    app_subtitle2:"Camp Office Prosecutor General Punjab, Supreme Court of Pakistan, Islamabad",
+    btn_signout:"Sign out",
+    guest_pendingNote:"Your account is pending approval by an Administrator. You can view the gallery, but cannot upload photos yet.",
+    btn_uploadPhoto:"Upload photo", btn_manageUsers:"Manage users",
+    gallery_empty:"No photos yet — be the first to upload one.",
+    app_footer:"Camp Office Gallery — every photo records who uploaded it and when.",
+    upload_title:"Upload a photo", upload_pickFile:"Choose image", upload_caption:"Caption (optional)",
+    btn_cancel:"Cancel", btn_upload:"Upload", btn_close:"Close",
+    admin_manageUsersTitle:"Manage staff accounts",
+    admin_manageUsersHint:"Approve pending accounts, or change a staff member's role. \"Guest\" = view only, \"Staff\" = can upload/delete own photos, \"Administrator\" = full control.",
+    lbl_mobile:"Mobile number", lbl_cnic:"CNIC number",
+    th_name:"Name", th_designation:"Designation", th_mobile:"Mobile", th_cnic:"CNIC", th_email:"Email", th_role:"Role",
+    role_guest:"Guest (pending)", role_user:"Staff", role_admin:"Administrator",
+    btn_remove:"Remove access"
+  },
+  ur: {
+    auth_createAccount:"اپنا اکاؤنٹ بنائیں",
+    auth_newAccountsNote:"نیا اکاؤنٹ پہلے \"زیر التوا\" (صرف دیکھنے کے قابل) رہتا ہے — کسی موجودہ Administrator کی منظوری کے بعد ہی تصاویر اپ لوڈ کی جا سکیں گی۔",
+    lbl_name:"پورا نام", lbl_designation:"عہدہ",
+    auth_yourEmail:"آپ کا ای میل", auth_password:"پاسورڈ", auth_confirmPassword:"پاسورڈ دوبارہ لکھیں",
+    auth_createAccountBtn:"اکاؤنٹ بنائیں", auth_backToSignin:"واپس سائن ان",
+    auth_warnText:"تصاویر اور پروفائل ڈیٹا اس سسٹم کے مشترکہ Firebase ڈیٹابیس میں آن لائن محفوظ ہوتا ہے، صرف سائن ان عملہ ہی دیکھ سکتا ہے۔",
+    auth_signin:"سائن ان", app_subtitle:"کیمپ آفس گیلری اور اسٹاف ڈائریکٹری",
+    auth_email:"ای میل", auth_createNewAccount:"نیا اکاؤنٹ بنائیں",
+    app_title:"کیمپ آفس گیلری",
+    app_subtitle2:"کیمپ آفس پراسیکیوٹر جنرل پنجاب، سپریم کورٹ آف پاکستان، اسلام آباد",
+    btn_signout:"سائن آؤٹ",
+    guest_pendingNote:"آپ کا اکاؤنٹ Administrator کی منظوری کا منتظر ہے۔ آپ گیلری دیکھ سکتے ہیں مگر ابھی تصویر اپ لوڈ نہیں کر سکتے۔",
+    btn_uploadPhoto:"تصویر اپ لوڈ کریں", btn_manageUsers:"صارفین کا انتظام",
+    gallery_empty:"ابھی کوئی تصویر موجود نہیں — سب سے پہلے آپ اپ لوڈ کریں۔",
+    app_footer:"کیمپ آفس گیلری — ہر تصویر پر ریکارڈ رہتا ہے کہ کس نے اور کب اپ لوڈ کی۔",
+    upload_title:"تصویر اپ لوڈ کریں", upload_pickFile:"تصویر منتخب کریں", upload_caption:"کیپشن (اختیاری)",
+    btn_cancel:"منسوخ", btn_upload:"اپ لوڈ کریں", btn_close:"بند کریں",
+    admin_manageUsersTitle:"عملے کے اکاؤنٹس کا انتظام",
+    admin_manageUsersHint:'زیر التوا اکاؤنٹس منظور کریں، یا کسی ملازم کا کردار تبدیل کریں۔ "Guest" = صرف دیکھنا، "Staff" = اپ لوڈ/اپنی تصویر ڈیلیٹ کر سکے، "Administrator" = مکمل اختیار۔',
+    lbl_mobile:"موبائل نمبر", lbl_cnic:"شناختی کارڈ نمبر (CNIC)",
+    th_name:"نام", th_designation:"عہدہ", th_mobile:"موبائل", th_cnic:"CNIC", th_email:"ای میل", th_role:"کردار",
+    role_guest:"Guest (زیر التوا)", role_user:"Staff", role_admin:"Administrator",
+    btn_remove:"رسائی ختم کریں"
+  }
+};
+function t(key){
+  var lang = document.documentElement.getAttribute("data-ui-lang") || "en";
+  return (I18N_UI[lang] && I18N_UI[lang][key]!=null) ? I18N_UI[lang][key] : (I18N_UI.en[key]||key);
+}
+function applyUILang(lang){
+  if(!I18N_UI[lang]) lang = "en";
+  document.documentElement.setAttribute("data-ui-lang", lang);
+  document.body.classList.toggle("lang-ur", lang==="ur");
+  document.querySelectorAll("[data-i18n]").forEach(function(el){
+    var key = el.getAttribute("data-i18n");
+    var val = I18N_UI[lang][key];
+    if(val!=null) el.textContent = val;
+  });
+  var sel = document.getElementById("uiLangSelect");
+  if(sel) sel.value = lang;
+  try{ localStorage.setItem(UI_LANG_STORAGE_KEY, lang); }catch(e){}
+  renderGallery();
+  if(CURRENT_USER) applyRoleUI();
+}
+document.getElementById("uiLangSelect").addEventListener("change", function(){ applyUILang(this.value); });
+(function initUILang(){
+  var saved = "en";
+  try{ saved = localStorage.getItem(UI_LANG_STORAGE_KEY) || "en"; }catch(e){}
+  applyUILang(saved);
+})();
+
+/* ---------------- Auth screens ---------------- */
+function showLogin(){
+  document.getElementById("authSetupScreen").style.display = "none";
+  document.getElementById("authLoginScreen").style.display = "flex";
+  document.getElementById("appMain").style.display = "none";
+}
+function showSetup(){
+  document.getElementById("authLoginScreen").style.display = "none";
+  document.getElementById("authSetupScreen").style.display = "flex";
+  document.getElementById("appMain").style.display = "none";
+}
+function showApp(){
+  document.getElementById("authLoginScreen").style.display = "none";
+  document.getElementById("authSetupScreen").style.display = "none";
+  document.getElementById("appMain").style.display = "block";
+}
+document.getElementById("goToSignupBtn").addEventListener("click", showSetup);
+document.getElementById("backToLoginBtn").addEventListener("click", showLogin);
+
+document.getElementById("setupBtn").addEventListener("click", function(){
+  var name = document.getElementById("setup_name").value.trim();
+  var designation = document.getElementById("setup_designation").value.trim();
+  var mobile = document.getElementById("setup_mobile").value.trim();
+  var cnic = document.getElementById("setup_cnic").value.trim();
+  var email = document.getElementById("setup_username").value.trim();
+  var pass = document.getElementById("setup_password").value;
+  var pass2 = document.getElementById("setup_password2").value;
+  var errEl = document.getElementById("setupError");
+  errEl.textContent = "";
+  if(!name || !designation){ errEl.textContent = "Please enter your name and designation."; return; }
+  if(!mobile){ errEl.textContent = "Please enter your mobile number."; return; }
+  if(mobile.replace(/\D/g,"").length < 10){ errEl.textContent = "Please enter a valid mobile number."; return; }
+  if(!cnic){ errEl.textContent = "Please enter your CNIC number."; return; }
+  if(cnic.replace(/\D/g,"").length !== 13){ errEl.textContent = "CNIC should have 13 digits (e.g. 12345-1234567-1)."; return; }
+  if(!email || !pass){ errEl.textContent = "Please enter an email and password."; return; }
+  if(pass !== pass2){ errEl.textContent = "Passwords do not match."; return; }
+  if(pass.length < 6){ errEl.textContent = "Password must be at least 6 characters."; return; }
+  auth.createUserWithEmailAndPassword(email, pass).then(function(cred){
+    return db.collection("users").doc(cred.user.uid).set({
+      name: name, designation: designation, mobile: mobile, cnic: cnic, email: email,
+      role: "guest", photoURL: null,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  }).catch(function(err){ errEl.textContent = err.message; });
+});
+
+document.getElementById("loginBtn").addEventListener("click", function(){
+  var email = document.getElementById("login_username").value.trim();
+  var pass = document.getElementById("login_password").value;
+  var errEl = document.getElementById("loginError");
+  errEl.textContent = "";
+  if(!email || !pass){ errEl.textContent = "Please enter your email and password."; return; }
+  auth.signInWithEmailAndPassword(email, pass).catch(function(err){ errEl.textContent = err.message; });
+});
+
+document.getElementById("signOutBtn").addEventListener("click", function(){ auth.signOut(); });
+
+/* ---------------- Auth state / role ---------------- */
+auth.onAuthStateChanged(function(user){
+  if(galleryUnsub){ galleryUnsub(); galleryUnsub = null; }
+  if(!user){ CURRENT_USER = null; showLogin(); return; }
+  db.collection("users").doc(user.uid).onSnapshot(function(doc){
+    if(!doc.exists){
+      // Profile document missing (shouldn't normally happen) — sign out.
+      auth.signOut();
+      return;
+    }
+    var d = doc.data();
+    CURRENT_USER = { uid:user.uid, email:user.email, name:d.name||"", designation:d.designation||"", mobile:d.mobile||"", cnic:d.cnic||"", role:d.role||"guest", photoURL:d.photoURL||null };
+    showApp();
+    applyRoleUI();
+    subscribeGallery();
+  }, function(err){
+    toast("Could not load your profile: " + err.message);
+  });
+});
+
+function applyRoleUI(){
+  if(!CURRENT_USER) return;
+  document.getElementById("whoAmI").textContent = CURRENT_USER.name + (CURRENT_USER.designation? (" — "+CURRENT_USER.designation) : "");
+  document.getElementById("roleChip").textContent = t(CURRENT_USER.role==="admin"? "role_admin" : CURRENT_USER.role==="user"? "role_user" : "role_guest");
+  document.body.classList.toggle("guest-mode", CURRENT_USER.role === "guest");
+  document.getElementById("uploadOpenBtn").style.display = (CURRENT_USER.role === "guest") ? "none" : "";
+  document.getElementById("adminPanelBtn").style.display = (CURRENT_USER.role === "admin") ? "" : "none";
+}
+
+/* ---------------- Gallery ---------------- */
+function subscribeGallery(){
+  if(galleryUnsub){ galleryUnsub(); }
+  galleryUnsub = db.collection("gallery").orderBy("uploadedAt","desc").onSnapshot(function(snap){
+    GALLERY_ITEMS = [];
+    snap.forEach(function(doc){ GALLERY_ITEMS.push(Object.assign({id:doc.id}, doc.data())); });
+    renderGallery();
+  }, function(err){ toast("Could not load gallery: " + err.message); });
+}
+function renderGallery(){
+  var grid = document.getElementById("galleryGrid");
+  var empty = document.getElementById("emptyState");
+  var chip = document.getElementById("photoCountChip");
+  if(!grid) return;
+  chip.textContent = GALLERY_ITEMS.length + (GALLERY_ITEMS.length===1? " photo" : " photos");
+  if(!GALLERY_ITEMS.length){ grid.innerHTML = ""; empty.style.display = "block"; return; }
+  empty.style.display = "none";
+  grid.innerHTML = GALLERY_ITEMS.map(function(p){
+    var canDelete = CURRENT_USER && (CURRENT_USER.role === "admin" || CURRENT_USER.uid === p.uploadedByUid);
+    return "<div class='gphoto' data-id='"+esc(p.id)+"'>"+
+      "<img src='"+esc(p.imageURL)+"' alt='' loading='lazy'>"+
+      (canDelete? "<button class='del-btn' data-del='"+esc(p.id)+"' title='Delete'>&times;</button>" : "")+
+      "<div class='meta'><b>"+esc(p.uploadedByName)+"</b>"+(p.uploadedByDesignation? (esc(p.uploadedByDesignation)+"<br>") : "")+esc(fmtDate(p.uploadedAt))+"</div>"+
+      "</div>";
+  }).join("");
+  grid.querySelectorAll(".gphoto").forEach(function(el){
+    el.addEventListener("click", function(e){
+      if(e.target.closest(".del-btn")) return;
+      openViewer(el.getAttribute("data-id"));
+    });
+  });
+  grid.querySelectorAll(".del-btn").forEach(function(btn){
+    btn.addEventListener("click", function(e){
+      e.stopPropagation();
+      deletePhoto(btn.getAttribute("data-del"));
+    });
+  });
+}
+
+/* ---------------- Upload modal ---------------- */
+var uploadModal = document.getElementById("uploadModal");
+document.getElementById("uploadOpenBtn").addEventListener("click", function(){
+  document.getElementById("uploadFileInput").value = "";
+  document.getElementById("uploadCaption").value = "";
+  document.getElementById("uploadProgressHint").textContent = "";
+  uploadModal.classList.add("show");
+});
+document.getElementById("uploadCancelBtn").addEventListener("click", function(){ uploadModal.classList.remove("show"); });
+uploadModal.addEventListener("click", function(e){ if(e.target === uploadModal) uploadModal.classList.remove("show"); });
+
+document.getElementById("uploadConfirmBtn").addEventListener("click", function(){
+  if(!CURRENT_USER || CURRENT_USER.role === "guest"){ toast("Your account is still pending approval."); return; }
+  var fileInput = document.getElementById("uploadFileInput");
+  var file = fileInput.files && fileInput.files[0];
+  var caption = document.getElementById("uploadCaption").value.trim();
+  var hint = document.getElementById("uploadProgressHint");
+  if(!file){ hint.textContent = "Please choose an image file."; return; }
+  if(!/^image\//.test(file.type)){ hint.textContent = "Please choose an image file."; return; }
+  if(file.size > 8*1024*1024){ hint.textContent = "Please choose an image smaller than 8 MB."; return; }
+  var id = db.collection("gallery").doc().id;
+  var ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g,"") || "jpg";
+  var path = "gallery/" + id + "." + ext;
+  hint.textContent = "Uploading…";
+  document.getElementById("uploadConfirmBtn").disabled = true;
+  var ref = storage.ref().child(path);
+  ref.put(file).then(function(){
+    return ref.getDownloadURL();
+  }).then(function(url){
+    return db.collection("gallery").doc(id).set({
+      imageURL: url,
+      storagePath: path,
+      caption: caption,
+      uploadedByUid: CURRENT_USER.uid,
+      uploadedByName: CURRENT_USER.name,
+      uploadedByDesignation: CURRENT_USER.designation,
+      uploadedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  }).then(function(){
+    document.getElementById("uploadConfirmBtn").disabled = false;
+    uploadModal.classList.remove("show");
+    toast("Photo uploaded.");
+  }).catch(function(err){
+    document.getElementById("uploadConfirmBtn").disabled = false;
+    hint.textContent = "Upload failed: " + err.message;
+  });
+});
+
+function deletePhoto(id){
+  var item = GALLERY_ITEMS.find(function(p){ return p.id === id; });
+  if(!item) return;
+  if(!confirm("Delete this photo? This cannot be undone.")) return;
+  var tasks = [db.collection("gallery").doc(id).delete()];
+  if(item.storagePath){
+    tasks.push(storage.ref().child(item.storagePath).delete().catch(function(){ /* file may already be gone */ }));
+  }
+  Promise.all(tasks).then(function(){
+    toast("Photo deleted.");
+  }).catch(function(err){ toast("Could not delete: " + err.message); });
+}
+
+/* ---------------- Viewer modal ---------------- */
+var viewerModal = document.getElementById("viewerModal");
+function openViewer(id){
+  var p = GALLERY_ITEMS.find(function(x){ return x.id === id; });
+  if(!p) return;
+  document.getElementById("viewerImg").src = p.imageURL;
+  document.getElementById("viewerMeta").innerHTML =
+    (p.caption? ("<b>"+esc(p.caption)+"</b><br>") : "") +
+    esc(p.uploadedByName) + (p.uploadedByDesignation? (", "+esc(p.uploadedByDesignation)) : "") + "<br>" +
+    esc(fmtDate(p.uploadedAt));
+  viewerModal.classList.add("show");
+}
+document.getElementById("viewerCloseBtn").addEventListener("click", function(){ viewerModal.classList.remove("show"); });
+viewerModal.addEventListener("click", function(e){ if(e.target === viewerModal) viewerModal.classList.remove("show"); });
+
+/* ---------------- Admin: manage users ---------------- */
+var adminModal = document.getElementById("adminModal");
+document.getElementById("adminPanelBtn").addEventListener("click", function(){
+  loadAdminUsers();
+  adminModal.classList.add("show");
+});
+document.getElementById("adminCloseBtn").addEventListener("click", function(){ adminModal.classList.remove("show"); });
+adminModal.addEventListener("click", function(e){ if(e.target === adminModal) adminModal.classList.remove("show"); });
+
+function loadAdminUsers(){
+  var body = document.getElementById("adminUsersBody");
+  body.innerHTML = "<tr><td colspan='7'>Loading…</td></tr>";
+  db.collection("users").get().then(function(snap){
+    var rows = [];
+    snap.forEach(function(doc){ rows.push(Object.assign({uid:doc.id}, doc.data())); });
+    rows.sort(function(a,b){ return (a.name||"").localeCompare(b.name||""); });
+    body.innerHTML = rows.map(function(u){
+      return "<tr data-uid='"+esc(u.uid)+"'>"+
+        "<td>"+esc(u.name)+"</td>"+
+        "<td>"+esc(u.designation)+"</td>"+
+        "<td>"+esc(u.mobile)+"</td>"+
+        "<td>"+esc(u.cnic)+"</td>"+
+        "<td>"+esc(u.email)+"</td>"+
+        "<td><select class='role-select' data-role-for='"+esc(u.uid)+"'>"+
+          "<option value='guest'"+(u.role==="guest"?" selected":"")+">"+esc(t("role_guest"))+"</option>"+
+          "<option value='user'"+(u.role==="user"?" selected":"")+">"+esc(t("role_user"))+"</option>"+
+          "<option value='admin'"+(u.role==="admin"?" selected":"")+">"+esc(t("role_admin"))+"</option>"+
+        "</select></td>"+
+        "<td><button class='btn ghost small' data-remove='"+esc(u.uid)+"'>"+esc(t("btn_remove"))+"</button></td>"+
+        "</tr>";
+    }).join("") || "<tr><td colspan='7'>No accounts yet.</td></tr>";
+    body.querySelectorAll("[data-role-for]").forEach(function(sel){
+      sel.addEventListener("change", function(){
+        var uid = sel.getAttribute("data-role-for");
+        db.collection("users").doc(uid).update({ role: sel.value }).then(function(){
+          toast("Role updated.");
+        }).catch(function(err){ toast("Could not update role: " + err.message); });
+      });
+    });
+    body.querySelectorAll("[data-remove]").forEach(function(btn){
+      btn.addEventListener("click", function(){
+        var uid = btn.getAttribute("data-remove");
+        if(uid === CURRENT_USER.uid){ toast("You cannot remove your own access."); return; }
+        if(!confirm("Remove this person's access to the gallery? (Their sign-in account itself must be deleted separately, in the Firebase Console, if needed.)")) return;
+        db.collection("users").doc(uid).delete().then(function(){
+          toast("Access removed."); loadAdminUsers();
+        }).catch(function(err){ toast("Could not remove: " + err.message); });
+      });
+    });
+  }).catch(function(err){
+    body.innerHTML = "<tr><td colspan='7'>Could not load: "+esc(err.message)+"</td></tr>";
+  });
+}
+</script>
+</body>
+</html>
