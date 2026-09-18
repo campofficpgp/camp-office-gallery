@@ -215,10 +215,28 @@
   .chat-msg.mine .chat-msg-bubble{background:var(--navy-tint);border-color:#C9DCEA;}
   .chat-msg.mine .chat-msg-meta{text-align:right;}
   .chat-empty{color:var(--muted);font-size:12.5px;text-align:center;margin-top:30px;}
-  .chat-input-bar{display:flex;gap:8px;padding:10px;border-top:1px solid var(--border);background:#fff;flex:0 0 auto;}
+  .chat-input-bar{display:flex;flex-direction:column;padding:6px 10px 10px;border-top:1px solid var(--border);background:#fff;flex:0 0 auto;position:relative;}
   .chat-input-bar textarea{flex:1;resize:none;height:40px;padding:8px 10px;font-size:13px;font-family:inherit;}
   .chat-input-bar button{border:none;background:var(--navy);color:#fff;border-radius:var(--radius);padding:0 14px;cursor:pointer;font-weight:600;font-family:inherit;}
   .chat-input-bar button:hover{background:var(--navy-dark);}
+  .chat-toolbar-row{display:flex;gap:2px;align-items:center;}
+  .chat-main-row{display:flex;gap:8px;align-items:center;margin-top:4px;}
+  .chat-icon-btn{border:none;background:transparent;font-size:19px;cursor:pointer;padding:0 2px;line-height:1;flex:0 0 auto;}
+  .chat-icon-btn:hover{opacity:.65;}
+  .chat-emoji-picker{position:absolute;left:10px;bottom:92px;display:none;grid-template-columns:repeat(8,1fr);gap:4px;
+    background:#fff;border:1px solid var(--border);border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.18);padding:8px;
+    max-width:280px;z-index:20;}
+  .chat-emoji-picker.open{display:grid;}
+  .chat-emoji-picker span{cursor:pointer;font-size:18px;text-align:center;border-radius:6px;padding:2px;}
+  .chat-emoji-picker span:hover{background:var(--bg);}
+  .chat-upload-progress{padding:6px 14px;font-size:11.5px;color:var(--muted);background:var(--bg);border-top:1px solid var(--border);flex:0 0 auto;}
+  .chat-msg-file{display:inline-flex;align-items:center;gap:6px;background:var(--bg);border:1px solid var(--border);
+    border-radius:8px;padding:6px 10px;text-decoration:none;color:var(--text);font-size:12.5px;max-width:100%;word-break:break-all;}
+  .chat-msg-file:hover{background:#fff;}
+  .chat-msg-image{max-width:200px;max-height:200px;border-radius:8px;display:block;cursor:pointer;object-fit:cover;}
+  .chat-msg-del{border:none;background:transparent;color:var(--muted);font-size:10.5px;cursor:pointer;padding:2px 0 0;
+    font-family:inherit;text-decoration:underline;}
+  .chat-msg-del:hover{color:var(--danger);}
   @media(max-width:640px){ #chatPanel{width:100%;right:-100%;} }
 </style>
 </head>
@@ -328,10 +346,19 @@
       <span data-i18n="chat_recording" style="flex:1;">Recording — click 🎤 again to send, or ✕ to cancel</span>
       <button type="button" id="chatMicCancelBtn" title="Cancel" style="border:none;background:#eee;color:#333;border-radius:6px;padding:2px 8px;cursor:pointer;">✕</button>
     </div>
+    <div class="chat-upload-progress" id="chatUploadProgress" style="display:none;"></div>
     <div class="chat-input-bar">
-      <textarea id="chatInput" data-i18n-placeholder="chat_typeMessage" placeholder="Type a message…"></textarea>
-      <button type="button" id="chatMicBtn" title="Record a voice message / صوتی پیغام ریکارڈ کریں">🎤</button>
-      <button id="chatSendBtn" data-i18n="chat_send">Send</button>
+      <div class="chat-toolbar-row">
+        <input type="file" id="chatFileInput" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" style="display:none;">
+        <button type="button" id="chatAttachBtn" class="chat-icon-btn" title="Attach file">📎</button>
+        <button type="button" id="chatEmojiBtn" class="chat-icon-btn" title="Emoji">😊</button>
+        <button type="button" id="chatMicBtn" class="chat-icon-btn" title="Record a voice message / صوتی پیغام ریکارڈ کریں">🎤</button>
+        <div class="chat-emoji-picker" id="chatEmojiPicker"></div>
+      </div>
+      <div class="chat-main-row">
+        <textarea id="chatInput" data-i18n-placeholder="chat_typeMessage" placeholder="Type a message…"></textarea>
+        <button id="chatSendBtn" data-i18n="chat_send">Send</button>
+      </div>
     </div>
   </div>
 </div>
@@ -622,7 +649,10 @@ var I18N_UI = {
 
     chat_title:"Team Chat", chat_typeMessage:"Type a message…", chat_send:"Send",
     chat_onlineCount:"{n} online", chat_noMessages:"No messages yet — say hello!", chat_you:"You", chat_guest:"Guest",
-    chat_recording:"Recording — click 🎤 again to send, or ✕ to cancel"
+    chat_recording:"Recording — click 🎤 again to send, or ✕ to cancel",
+    chat_delete:"Delete", chat_attach:"Attach file", chat_emoji:"Emoji",
+    chat_fileTooBig:"File should be under 10MB.", chat_uploadFailed:"File upload failed.",
+    chat_uploading:"Uploading… {p}%"
   },
   ur: {
     auth_createAccount:"اپنا اکاؤنٹ بنائیں",
@@ -694,7 +724,10 @@ var I18N_UI = {
 
     chat_title:"ٹیم چیٹ", chat_typeMessage:"پیغام لکھیں…", chat_send:"بھیجیں",
     chat_onlineCount:"{n} آن لائن", chat_noMessages:"ابھی تک کوئی پیغام نہیں — سلام کہیں!", chat_you:"آپ", chat_guest:"گیسٹ",
-    chat_recording:"ریکارڈنگ ہو رہی ہے — بھیجنے کے لیے 🎤 دوبارہ دبائیں، یا منسوخ کرنے کے لیے ✕"
+    chat_recording:"ریکارڈنگ ہو رہی ہے — بھیجنے کے لیے 🎤 دوبارہ دبائیں، یا منسوخ کرنے کے لیے ✕",
+    chat_delete:"حذف کریں", chat_attach:"فائل منسلک کریں", chat_emoji:"ایموجی",
+    chat_fileTooBig:"فائل 10MB سے کم ہونی چاہیے۔", chat_uploadFailed:"فائل اپلوڈ ناکام ہو گئی۔",
+    chat_uploading:"اپلوڈ ہو رہا ہے… {p}%"
   }
 };
 function t(key){
@@ -923,7 +956,7 @@ function startChat(){
   chatUnsubMessages = db.collection("chatMessages").orderBy("timestamp","desc").limit(150)
     .onSnapshot(function(snap){
       var list = [];
-      snap.forEach(function(doc){ list.push(doc.data()); });
+      snap.forEach(function(doc){ var d = doc.data(); d.id = doc.id; list.push(d); });
       list.reverse();
       CHAT_MESSAGES = list;
       if(!chatFirstSnapshot){
@@ -1009,13 +1042,24 @@ function renderChatMessages(){
     var mine = CURRENT_USER && msg.senderUid===CURRENT_USER.uid;
     var name = mine? (I18N_UI[lang].chat_you||"You") : chatDisplayName(msg);
     var time = fmtChatTime(tsToMillis(msg.timestamp));
+    var canDelete = !!(msg.id && (mine || (CURRENT_USER && CURRENT_USER.galleryStatus==="admin")));
     var div = document.createElement("div");
     div.className = "chat-msg"+(mine?" mine":"");
-    var bubbleHtml = msg.audioURL
-      ? "<audio controls src='"+escChat(msg.audioURL)+"' style='max-width:220px;height:34px;display:block;'></audio>"
-      : escChat(msg.text);
+    var bubbleHtml;
+    if(msg.fileURL && msg.fileType==="image"){
+      bubbleHtml = "<img class='chat-msg-image' src='"+escChat(msg.fileURL)+"' alt='"+escChat(msg.fileName||"image")+"' onclick=\"window.open('"+escChat(msg.fileURL)+"','_blank')\">";
+      if(msg.text) bubbleHtml += "<div style='margin-top:4px;'>"+escChat(msg.text)+"</div>";
+    } else if(msg.fileURL){
+      bubbleHtml = "<a class='chat-msg-file' href='"+escChat(msg.fileURL)+"' target='_blank' rel='noopener'>📄 "+escChat(msg.fileName||"file")+"</a>";
+      if(msg.text) bubbleHtml += "<div style='margin-top:4px;'>"+escChat(msg.text)+"</div>";
+    } else if(msg.audioURL){
+      bubbleHtml = "<audio controls src='"+escChat(msg.audioURL)+"' style='max-width:220px;height:34px;display:block;'></audio>";
+    } else {
+      bubbleHtml = escChat(msg.text);
+    }
+    var delHtml = canDelete ? "<button type='button' class='chat-msg-del' data-id='"+escChat(msg.id)+"'>"+escChat(t("chat_delete"))+"</button>" : "";
     div.innerHTML = "<div class='chat-msg-meta'>"+escChat(name)+(time? " · "+escChat(time):"")+"</div>"+
-      "<div class='chat-msg-bubble'>"+bubbleHtml+"</div>";
+      "<div class='chat-msg-bubble'>"+bubbleHtml+"</div>"+delHtml;
     body.appendChild(div);
   });
   if(wasNearBottom) body.scrollTop = body.scrollHeight;
@@ -1048,6 +1092,88 @@ document.getElementById("chatSendBtn").addEventListener("click", sendChatMessage
 document.getElementById("chatInput").addEventListener("keydown", function(ev){
   if(ev.key==="Enter" && !ev.shiftKey){ ev.preventDefault(); sendChatMessage(); }
 });
+
+function deleteChatMessage(id){
+  if(!id) return;
+  db.collection("chatMessages").doc(id).delete().catch(function(err){
+    toast("Could not delete message: "+err.message);
+  });
+}
+document.getElementById("chatMessages").addEventListener("click", function(ev){
+  if(ev.target.classList && ev.target.classList.contains("chat-msg-del")){
+    deleteChatMessage(ev.target.getAttribute("data-id"));
+  }
+});
+(function(){
+  var attachBtn = document.getElementById("chatAttachBtn");
+  var fileInput = document.getElementById("chatFileInput");
+  var progressEl = document.getElementById("chatUploadProgress");
+  if(attachBtn && fileInput){
+    attachBtn.addEventListener("click", function(){ fileInput.click(); });
+    fileInput.addEventListener("change", function(){
+      var f = fileInput.files && fileInput.files[0];
+      fileInput.value = "";
+      if(!f) return;
+      if(!CURRENT_USER) return;
+      if(f.size > 10*1024*1024){ toast(t("chat_fileTooBig")); return; }
+      var isImage = /^image\//.test(f.type);
+      var fd = new FormData();
+      fd.append("file", f);
+      fd.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+      var endpoint = "https://api.cloudinary.com/v1_1/"+CLOUDINARY_CLOUD_NAME+"/"+(isImage? "image":"auto")+"/upload";
+      var xhr = new XMLHttpRequest();
+      xhr.open("POST", endpoint);
+      if(progressEl){ progressEl.style.display = "block"; progressEl.textContent = t("chat_uploading").replace("{p}","0"); }
+      xhr.upload.onprogress = function(ev){
+        if(ev.lengthComputable && progressEl){ progressEl.textContent = t("chat_uploading").replace("{p}", Math.round(ev.loaded/ev.total*100)); }
+      };
+      xhr.onload = function(){
+        if(progressEl) progressEl.style.display = "none";
+        try{
+          var res = JSON.parse(xhr.responseText);
+          if(res && res.secure_url){
+            db.collection("chatMessages").add({
+              text: "",
+              fileURL: res.secure_url,
+              fileName: f.name,
+              fileType: isImage? "image":"file",
+              senderUid: CURRENT_USER.uid,
+              senderEmail: CURRENT_USER.email,
+              senderName: CURRENT_USER.name || (CURRENT_USER.email? CURRENT_USER.email.split("@")[0] : ""),
+              senderRole: CURRENT_USER.galleryStatus,
+              timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            }).catch(function(err){ toast("Could not send file: "+err.message); });
+          } else { toast(t("chat_uploadFailed")); }
+        }catch(e){ toast(t("chat_uploadFailed")); }
+      };
+      xhr.onerror = function(){ if(progressEl) progressEl.style.display = "none"; toast(t("chat_uploadFailed")); };
+      xhr.send(fd);
+    });
+  }
+  var CHAT_EMOJIS = ["😀","😂","😊","😍","👍","👏","🙏","🎉","❤️","😢","😮","😡","🤔","👌","🔥","✅","❌","📌","📅","⏰","💬","☕","🙌","😴"];
+  var emojiBtn = document.getElementById("chatEmojiBtn");
+  var emojiPicker = document.getElementById("chatEmojiPicker");
+  if(emojiBtn && emojiPicker){
+    emojiPicker.innerHTML = CHAT_EMOJIS.map(function(e){ return "<span>"+e+"</span>"; }).join("");
+    emojiBtn.addEventListener("click", function(ev){
+      ev.stopPropagation();
+      emojiPicker.classList.toggle("open");
+    });
+    emojiPicker.addEventListener("click", function(ev){
+      if(ev.target.tagName==="SPAN"){
+        var input = document.getElementById("chatInput");
+        input.value += ev.target.textContent;
+        input.focus();
+        emojiPicker.classList.remove("open");
+      }
+    });
+    document.addEventListener("click", function(ev){
+      if(emojiPicker.classList.contains("open") && ev.target!==emojiBtn && !emojiPicker.contains(ev.target)){
+        emojiPicker.classList.remove("open");
+      }
+    });
+  }
+})();
 
 /* ---------------- Voice messages (record with the mic, upload to Cloudinary as an
    audio file, send as a chat message) — item 32: recorded voice notes, not a live call. ---------------- */
