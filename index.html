@@ -907,7 +907,7 @@ auth.onAuthStateChanged(function(user){
       return;
     }
     var d = doc.data();
-    var globalRole = d.role || "guest";
+    var globalRole = d.role || ((d.roleV2==="admin" || d.roleV2==="super_admin") ? "admin" : "guest");
     var effectiveGalleryStatus = (globalRole === "admin") ? "admin" : (d.galleryStatus || "pending");
     CURRENT_USER = { uid:user.uid, email:user.email, name:d.name||"", designation:d.designation||"", mobile:d.mobile||"", cnic:d.cnic||"", role:globalRole, galleryStatus:effectiveGalleryStatus, photoURL:d.photoURL||null };
     if(d.theme) applyTheme(d.theme);
