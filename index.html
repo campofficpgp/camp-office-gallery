@@ -846,24 +846,17 @@ document.getElementById("uiLangSelect").addEventListener("change", function(){ a
   applyUILang(saved);
 })();
 
-/* ---------------- Auth screens ---------------- */
-function showLogin(){
-  document.getElementById("authSetupScreen").style.display = "none";
-  document.getElementById("authLoginScreen").style.display = "flex";
-  document.getElementById("appMain").style.display = "none";
-}
-function showSetup(){
-  document.getElementById("authLoginScreen").style.display = "none";
-  document.getElementById("authSetupScreen").style.display = "flex";
-  document.getElementById("appMain").style.display = "none";
-  /* Start each visit to the sign-up screen with a clean slate, so a photo picked
-     during an earlier, abandoned attempt is never silently attached to a new one. */
-  setupPhotoURL = null;
-  var wrap = document.getElementById("setupPhotoPreviewWrap");
-  if(wrap) wrap.style.display = "none";
-  var fileInp = document.getElementById("setupPhotoFile");
-  if(fileInp) fileInp.value = "";
-}
+/* ---------------- Auth screens ----------------
+   Sign-in and account creation now happen in ONE place only — the main Camp
+   Office portal (camp-office-suite, one level up). Signing in there signs
+   you in here too (same shared Firebase project/session), so this page
+   never needs to show its own login/sign-up form: if it ever finds itself
+   signed out, it just sends the visitor back to the portal to sign in.
+   Name/designation/mobile/CNIC/photo also now live in one place only — the
+   Employee Directory in the portal (admin-maintained) — instead of being
+   collected again here at sign-up. */
+function showLogin(){ location.href = "../"; }
+function showSetup(){ location.href = "../"; }
 
 /* ---------------- Sign-up: optional profile picture (uploaded to Cloudinary as soon as
    it's picked, same as the gallery's own photo uploads — the account doesn't exist yet
@@ -1397,7 +1390,7 @@ document.getElementById("helpCloseBtn").addEventListener("click", function(){
 
 function applyRoleUI(){
   if(!CURRENT_USER) return;
-  document.getElementById("whoAmI").textContent = CURRENT_USER.name + (CURRENT_USER.designation? (" — "+CURRENT_USER.designation) : "");
+  document.getElementById("whoAmI").textContent = (CURRENT_USER.name || (CURRENT_USER.email? CURRENT_USER.email.split("@")[0] : "")) + (CURRENT_USER.designation? (" — "+CURRENT_USER.designation) : "");
   document.getElementById("roleChip").textContent = t(CURRENT_USER.galleryStatus==="admin"? "role_admin" : CURRENT_USER.galleryStatus==="staff"? "role_user" : "role_guest");
   document.body.classList.toggle("guest-mode", CURRENT_USER.galleryStatus === "pending");
   document.getElementById("uploadOpenBtn").style.display = (CURRENT_USER.galleryStatus === "pending") ? "none" : "";
@@ -1496,8 +1489,8 @@ document.getElementById("uploadConfirmBtn").addEventListener("click", function()
       cloudinaryPublicId: res.public_id || "",
       caption: caption,
       uploadedBy: CURRENT_USER.uid,
-      uploadedByName: CURRENT_USER.name,
-      uploadedByDesignation: CURRENT_USER.designation,
+      uploadedByName: CURRENT_USER.name || (CURRENT_USER.email? CURRENT_USER.email.split("@")[0] : ""),
+      uploadedByDesignation: CURRENT_USER.designation || "",
       uploadedAt: firebase.firestore.FieldValue.serverTimestamp()
     }).then(function(){
       uploadModal.classList.remove("show");
