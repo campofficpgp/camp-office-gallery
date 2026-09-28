@@ -761,6 +761,9 @@ function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g, function(c){retu
 function fmtDate(ts){
   if(!ts) return "";
   var d = ts.toDate? ts.toDate() : new Date(ts);
+  if(isNaN(d.getTime())) return ""; /* never show the literal text "Invalid Date" -- a
+     serverTimestamp() that hasn't resolved locally yet, or any other unparseable value,
+     just shows blank for a moment instead */
   return d.toLocaleDateString(undefined,{year:"numeric",month:"short",day:"numeric"}) + " " +
          d.toLocaleTimeString(undefined,{hour:"2-digit",minute:"2-digit"});
 }
