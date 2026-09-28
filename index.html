@@ -745,8 +745,11 @@ document.getElementById("themeSwitcher").addEventListener("change", function(){
 
 var CURRENT_USER = null; // {uid,email,name,designation,role,galleryStatus,photoURL}
                           // role = global SSO role ("admin"|"guest", shared with the other 3 systems)
-                          // galleryStatus = effective Gallery-only status ("admin"|"staff"|"pending"),
-                          //   derived below: a global "admin" is always treated as Gallery admin too.
+                          // galleryStatus = effective Gallery permission tier ("admin"|"pending"),
+                          //   derived below entirely from the shared roleV2 field: ONLY super_admin -> "admin"
+                          //   (full upload/manage control); every other role (admin, data_entry, viewer) -> "pending"
+                          //   (view-only). There is no independent Gallery-only role anymore, and no "staff" tier --
+                          //   uploading/managing photos here is the Super Admin's job alone.
 var galleryUnsub = null;
 var GALLERY_ITEMS = [];
 
@@ -773,7 +776,7 @@ var UI_LANG_STORAGE_KEY = "campgallery_ui_lang";
 var I18N_UI = {
   en: {
     auth_createAccount:"Create your account",
-    auth_newAccountsNote:'New accounts start as "Pending" (view-only). An existing Administrator must approve you afterwards before you can upload photos.',
+    auth_newAccountsNote:"New accounts can sign in and view the gallery right away. Uploading and managing photos here is limited to the Super Admin only.",
     lbl_name:"Full name", lbl_designation:"Designation",
     auth_yourEmail:"Your email", auth_password:"Password", auth_confirmPassword:"Confirm password",
     auth_createAccountBtn:"Create account", auth_backToSignin:"Back to sign in",
@@ -783,47 +786,49 @@ var I18N_UI = {
     app_title:"Camp Office Gallery",
     app_subtitle2:"Camp Office Prosecutor General Punjab, Supreme Court of Pakistan, Islamabad",
     btn_signout:"Sign out",
-    guest_pendingNote:"Your account is pending approval by an Administrator. You can view the gallery, but cannot upload photos yet.",
+    guest_pendingNote:"You can view the gallery here. Uploading and managing photos is limited to the Super Admin account only.",
     btn_uploadPhoto:"Upload photo", btn_manageUsers:"Manage users",
     gallery_empty:"No photos yet — be the first to upload one.",
     app_footer:"Camp Office Gallery — every photo records who uploaded it and when.",
     upload_title:"Upload a photo", upload_pickFile:"Choose image", upload_caption:"Caption (optional)",
     btn_cancel:"Cancel", btn_upload:"Upload", btn_close:"Close",
     admin_manageUsersTitle:"Manage staff accounts",
-    admin_manageUsersHint:"Approve pending accounts, or change a staff member's role. \"Guest\" = view only, \"Staff\" = can upload/delete own photos, \"Administrator\" = full control.",
+    admin_manageUsersHint:"The role shown here always matches the Suite's Admin Controls panel exactly. Only the Super Admin can upload or manage photos in this gallery — everyone else (Viewer, Data Entry, and even a regular Admin) is view-only here. To change someone's role, open \"Change in Suite\" next to their name.",
+    admin_changeInSuite:"Change in Suite →",
     lbl_mobile:"Mobile number", lbl_cnic:"CNIC number", lbl_profilePic:"Profile picture (optional)",
     th_name:"Name", th_designation:"Designation", th_mobile:"Mobile", th_cnic:"CNIC", th_email:"Email", th_role:"Role",
     role_guest:"Guest (pending)", role_user:"Staff", role_admin:"Administrator",
+    gr_role_viewer:"Viewer", gr_role_data_entry:"Data Entry", gr_role_admin:"Admin", gr_role_super_admin:"Super Admin",
     btn_remove:"Remove access",
 
     nav_help:"Help / Guide",
     help_title:"Help & User Guide",
-    help_introText:"This is one shared photo gallery and staff directory for the whole office. A new account starts as \"Guest\" (pending) and can only view the gallery; once an Administrator approves it as \"Staff\", that person can upload and delete their own photos. An Administrator can do everything, including approving accounts and managing everyone's role from \"Manage users\".",
-    help_signup_title:"Signing up & getting approved",
+    help_introText:"This is one shared photo gallery and staff directory for the whole office. Everyone with an account can sign in and view the gallery and staff directory. Uploading, deleting, and managing photos here is limited to the Super Admin only — the same Super Admin who manages everyone's role from the Suite's Admin Controls.",
+    help_signup_title:"Signing up",
     help_signup_intro:"Everyone creates their own account the first time — there's no separate \"add a person\" step.",
     help_signup_s1:"On the sign-in screen, press \"Create a new account\" and fill in your name, designation, mobile number, CNIC, email, and a password.",
-    help_signup_s2:"Your account starts as \"Guest (pending)\" — you can sign in and view the gallery immediately, but the \"Upload photo\" button stays disabled until an Administrator approves you.",
-    help_signup_s3:"Ask an Administrator to open \"Manage users\" and change your role to \"Staff\" — after that, uploading and deleting your own photos works right away.",
+    help_signup_s2:"Your account can sign in and view the gallery right away. The \"Upload photo\" button stays hidden, because uploading here is limited to the Super Admin only — no other role can be approved into it.",
+    help_signup_s3:"If a photo needs to be added to the gallery, it has to be uploaded by the Super Admin account.",
     help_upload_title:"Uploading a photo",
-    help_upload_intro:"Available once your account is approved as Staff or Administrator.",
+    help_upload_intro:"Available only to the Super Admin.",
     help_upload_s1:"Press \"Upload photo\", choose an image file (under 8 MB), optionally add a caption, then press \"Upload\".",
     help_upload_s2:"Every photo automatically records who uploaded it and exactly when — this is shown under the photo and in its full view.",
     help_view_title:"Viewing & deleting a photo",
     help_view_intro:"Click any photo in the grid to see it full-size with its caption and uploader details.",
-    help_view_s1:"Hover over a photo to reveal a small ✕ button in its corner — this appears only on photos you're allowed to delete.",
-    help_view_s2:"Staff can delete their own uploads; an Administrator can delete any photo in the gallery.",
-    help_admin_title:"Manage users (Administrator)",
-    help_admin_intro:"This controls who can sign in, upload, and manage the gallery.",
-    help_admin_s1:"Open \"Manage users\" to see every staff member who has signed up, with their name, designation, mobile, CNIC, and email.",
-    help_admin_s2:"Change the dropdown next to a name to approve a pending Guest as Staff, promote someone to Administrator, or move someone back to Guest.",
-    help_admin_s3:"\"Remove access\" deletes their profile from this system (their sign-in account itself needs a separate step in the Firebase Console if it must be removed too).",
+    help_view_s1:"Hover over a photo to reveal a small ✕ button in its corner — this appears only for the Super Admin.",
+    help_view_s2:"Only the Super Admin can delete a photo, whether it's their own upload or anyone else's.",
+    help_admin_title:"Manage staff accounts (Super Admin only)",
+    help_admin_intro:"This is a read-only list of everyone's role — it does not grant gallery upload access to anyone, since only the Super Admin ever has that.",
+    help_admin_s1:"Open \"Manage users\" to see every staff member who has signed up, with their name, designation, mobile, CNIC, email, and role.",
+    help_admin_s2:"Use \"Change in Suite\" next to a name to open the Suite's Admin Controls, where roles are actually changed. Gallery upload/manage access always follows the Super Admin role — it isn't set separately here.",
+    help_admin_s3:"To remove someone's access entirely, do this from the Suite's Admin Controls — their account is shared across all camp-office systems, so it should not be removed from just one of them.",
     help_faqTitle:"Frequently Asked Questions",
-    help_faq1_q:"I signed up but the \"Upload photo\" button is disabled — why?",
-    help_faq1_a:"New accounts start as \"Guest (pending)\" for safety. An Administrator needs to approve you as \"Staff\" from \"Manage users\" before you can upload.",
-    help_faq2_q:"What's the difference between Guest, Staff, and Administrator?",
-    help_faq2_a:"Guest (pending) can only view the gallery. Staff can also upload photos and delete their own. Administrator can do everything, including approving accounts, changing anyone's role, and deleting any photo.",
+    help_faq1_q:"I signed up but the \"Upload photo\" button is hidden — why?",
+    help_faq1_a:"Uploading in this gallery is limited to the Super Admin account only. No other role — including a regular Admin — can be given upload access here.",
+    help_faq2_q:"What's the difference between Viewer, Data Entry, Admin, and Super Admin here?",
+    help_faq2_a:"In this gallery specifically, only the Super Admin can upload, delete any photo, and manage accounts. Viewer, Data Entry, and a regular Admin can all view the gallery and staff directory, but none of them can upload or delete.",
     help_faq3_q:"Can I delete someone else's photo?",
-    help_faq3_a:"Only an Administrator can delete a photo uploaded by someone else. Staff can only delete their own uploads.",
+    help_faq3_a:"Only the Super Admin can delete a photo, including one uploaded by someone else.",
     help_faq4_q:"How do I switch between English and Urdu?",
     help_faq4_a:"Use the language selector at the top of the screen. It changes menus, labels, and buttons instantly for everyone's own screen.",
     help_faq5_q:"Where are the photos stored — is my data safe if this computer breaks?",
@@ -848,7 +853,7 @@ var I18N_UI = {
   },
   ur: {
     auth_createAccount:"اپنا اکاؤنٹ بنائیں",
-    auth_newAccountsNote:"نیا اکاؤنٹ پہلے \"زیر التوا\" (صرف دیکھنے کے قابل) رہتا ہے — کسی موجودہ Administrator کی منظوری کے بعد ہی تصاویر اپ لوڈ کی جا سکیں گی۔",
+    auth_newAccountsNote:"نیا اکاؤنٹ فوراً سائن اِن ہو کر گیلری دیکھ سکتا ہے۔ یہاں تصویر اپ لوڈ اور انتظام صرف Super Admin کر سکتا ہے۔",
     lbl_name:"پورا نام", lbl_designation:"عہدہ",
     auth_yourEmail:"آپ کا ای میل", auth_password:"پاسورڈ", auth_confirmPassword:"پاسورڈ دوبارہ لکھیں",
     auth_createAccountBtn:"اکاؤنٹ بنائیں", auth_backToSignin:"واپس سائن ان",
@@ -858,47 +863,49 @@ var I18N_UI = {
     app_title:"کیمپ آفس گیلری",
     app_subtitle2:"کیمپ آفس پراسیکیوٹر جنرل پنجاب، سپریم کورٹ آف پاکستان، اسلام آباد",
     btn_signout:"سائن آؤٹ",
-    guest_pendingNote:"آپ کا اکاؤنٹ Administrator کی منظوری کا منتظر ہے۔ آپ گیلری دیکھ سکتے ہیں مگر ابھی تصویر اپ لوڈ نہیں کر سکتے۔",
+    guest_pendingNote:"آپ یہاں گیلری دیکھ سکتے ہیں۔ تصویر اپ لوڈ اور انتظام صرف Super Admin اکاؤنٹ کر سکتا ہے۔",
     btn_uploadPhoto:"تصویر اپ لوڈ کریں", btn_manageUsers:"صارفین کا انتظام",
     gallery_empty:"ابھی کوئی تصویر موجود نہیں — سب سے پہلے آپ اپ لوڈ کریں۔",
     app_footer:"کیمپ آفس گیلری — ہر تصویر پر ریکارڈ رہتا ہے کہ کس نے اور کب اپ لوڈ کی۔",
     upload_title:"تصویر اپ لوڈ کریں", upload_pickFile:"تصویر منتخب کریں", upload_caption:"کیپشن (اختیاری)",
     btn_cancel:"منسوخ", btn_upload:"اپ لوڈ کریں", btn_close:"بند کریں",
     admin_manageUsersTitle:"عملے کے اکاؤنٹس کا انتظام",
-    admin_manageUsersHint:'زیر التوا اکاؤنٹس منظور کریں، یا کسی ملازم کا کردار تبدیل کریں۔ "Guest" = صرف دیکھنا، "Staff" = اپ لوڈ/اپنی تصویر ڈیلیٹ کر سکے، "Administrator" = مکمل اختیار۔',
+    admin_manageUsersHint:'یہاں دکھایا گیا کردار ہمیشہ سوٹ کے Admin Controls پینل سے بالکل مماثل ہوتا ہے۔ اس گیلری میں تصویر اپ لوڈ یا انتظام صرف Super Admin کر سکتا ہے — باقی سب (Viewer، Data Entry، اور عام Admin بھی) صرف دیکھ سکتے ہیں۔ کسی کا کردار تبدیل کرنے کے لیے نام کے سامنے "سوٹ میں تبدیل کریں" کھولیں۔',
+    admin_changeInSuite:"سوٹ میں تبدیل کریں ←",
     lbl_mobile:"موبائل نمبر", lbl_cnic:"شناختی کارڈ نمبر (CNIC)", lbl_profilePic:"پروفائل تصویر (اختیاری)",
     th_name:"نام", th_designation:"عہدہ", th_mobile:"موبائل", th_cnic:"CNIC", th_email:"ای میل", th_role:"کردار",
     role_guest:"Guest (زیر التوا)", role_user:"Staff", role_admin:"Administrator",
+    gr_role_viewer:"ناظر", gr_role_data_entry:"ڈیٹا انٹری", gr_role_admin:"ایڈمن", gr_role_super_admin:"سپر ایڈمن",
     btn_remove:"رسائی ختم کریں",
 
     nav_help:"مدد / رہنمائی",
     help_title:"مدد اور صارف رہنما",
-    help_introText:"یہ پورے دفتر کے لیے ایک مشترکہ تصویری گیلری اور اسٹاف ڈائریکٹری ہے۔ نیا اکاؤنٹ \"Guest\" (زیر التوا) کے طور پر شروع ہوتا ہے اور صرف گیلری دیکھ سکتا ہے؛ جب کوئی Administrator اسے \"Staff\" کے طور پر منظور کر دے، تو وہ شخص تصاویر اپ لوڈ اور اپنی تصاویر حذف کر سکتا ہے۔ Administrator ہر کام کر سکتا ہے، بشمول اکاؤنٹس منظور کرنا اور \"Manage users\" سے سب کا کردار تبدیل کرنا۔",
-    help_signup_title:"سائن اپ اور منظوری حاصل کرنا",
+    help_introText:"یہ پورے دفتر کے لیے ایک مشترکہ تصویری گیلری اور اسٹاف ڈائریکٹری ہے۔ ہر اکاؤنٹ سائن اِن ہو کر گیلری اور اسٹاف ڈائریکٹری دیکھ سکتا ہے۔ تصویر اپ لوڈ کرنا، حذف کرنا، اور انتظام صرف Super Admin کر سکتا ہے — وہی Super Admin جو سوٹ کے Admin Controls سے سب کا کردار مقرر کرتا ہے۔",
+    help_signup_title:"سائن اپ کرنا",
     help_signup_intro:"ہر شخص پہلی بار اپنا اکاؤنٹ خود بناتا ہے — یہاں الگ سے \"شخص شامل کریں\" کا کوئی مرحلہ نہیں۔",
     help_signup_s1:"سائن اِن اسکرین پر \"نیا اکاؤنٹ بنائیں\" دبائیں اور اپنا نام، عہدہ، موبائل نمبر، CNIC، ای میل، اور پاسورڈ درج کریں۔",
-    help_signup_s2:"آپ کا اکاؤنٹ \"Guest (زیر التوا)\" کے طور پر شروع ہوتا ہے — آپ فوراً سائن اِن ہو کر گیلری دیکھ سکتے ہیں، مگر \"تصویر اپ لوڈ کریں\" کا بٹن اس وقت تک غیر فعال رہتا ہے جب تک کوئی Administrator آپ کو منظور نہ کرے۔",
-    help_signup_s3:"کسی Administrator سے کہیں کہ وہ \"Manage users\" کھول کر آپ کا کردار \"Staff\" میں تبدیل کرے — اس کے بعد اپ لوڈ اور اپنی تصاویر حذف کرنا فوراً کام کرنے لگے گا۔",
+    help_signup_s2:"آپ کا اکاؤنٹ فوراً سائن اِن ہو کر گیلری دیکھ سکتا ہے۔ \"تصویر اپ لوڈ کریں\" کا بٹن نظر نہیں آئے گا، کیونکہ یہاں اپ لوڈ صرف Super Admin کر سکتا ہے — کسی اور کردار کو یہ اجازت نہیں دی جا سکتی۔",
+    help_signup_s3:"اگر گیلری میں کوئی تصویر شامل کرنی ہو تو وہ Super Admin اکاؤنٹ سے ہی اپ لوڈ کرنا ہوگی۔",
     help_upload_title:"تصویر اپ لوڈ کرنا",
-    help_upload_intro:"یہ صرف اس وقت دستیاب ہوتا ہے جب آپ کا اکاؤنٹ Staff یا Administrator کے طور پر منظور ہو چکا ہو۔",
+    help_upload_intro:"یہ صرف Super Admin کے لیے دستیاب ہے۔",
     help_upload_s1:"\"تصویر اپ لوڈ کریں\" دبائیں، ایک تصویری فائل (8 MB سے کم) منتخب کریں، چاہیں تو کیپشن شامل کریں، پھر \"اپ لوڈ کریں\" دبائیں۔",
     help_upload_s2:"ہر تصویر خودکار طور پر ریکارڈ کرتی ہے کہ اسے کس نے اور بالکل کب اپ لوڈ کیا — یہ تصویر کے نیچے اور اس کے مکمل منظر میں دکھایا جاتا ہے۔",
     help_view_title:"تصویر دیکھنا اور حذف کرنا",
     help_view_intro:"گرڈ میں کسی بھی تصویر پر کلک کریں تاکہ اسے مکمل سائز میں، کیپشن اور اپ لوڈ کرنے والے کی تفصیل کے ساتھ دیکھا جا سکے۔",
-    help_view_s1:"کسی تصویر پر ماؤس لے جانے سے اس کے کونے میں ایک چھوٹا ✕ بٹن نظر آتا ہے — یہ صرف انہی تصاویر پر نظر آتا ہے جنہیں آپ حذف کر سکتے ہیں۔",
-    help_view_s2:"Staff اپنی اپ لوڈ کردہ تصاویر حذف کر سکتا ہے؛ Administrator گیلری کی کوئی بھی تصویر حذف کر سکتا ہے۔",
-    help_admin_title:"صارفین کا انتظام (Administrator)",
-    help_admin_intro:"یہ کنٹرول کرتا ہے کہ کون سائن اِن، اپ لوڈ، اور گیلری کا انتظام کر سکتا ہے۔",
-    help_admin_s1:"\"Manage users\" کھول کر ہر اس اسٹاف ممبر کو دیکھیں جس نے سائن اپ کیا ہے، اس کے نام، عہدے، موبائل، CNIC، اور ای میل کے ساتھ۔",
-    help_admin_s2:"کسی نام کے ساتھ موجود ڈراپ ڈاؤن تبدیل کر کے کسی زیر التوا Guest کو Staff کے طور پر منظور کریں، کسی کو Administrator بنائیں، یا کسی کو واپس Guest کر دیں۔",
-    help_admin_s3:"\"رسائی ختم کریں\" اس شخص کی پروفائل اس سسٹم سے حذف کر دیتا ہے (اگر ان کا سائن اِن اکاؤنٹ بھی حذف کرنا ہو تو یہ Firebase Console میں الگ سے کرنا ہوگا)۔",
+    help_view_s1:"کسی تصویر پر ماؤس لے جانے سے اس کے کونے میں ایک چھوٹا ✕ بٹن نظر آتا ہے — یہ صرف Super Admin کو نظر آتا ہے۔",
+    help_view_s2:"صرف Super Admin کوئی بھی تصویر حذف کر سکتا ہے، چاہے وہ اپنی اپ لوڈ کردہ ہو یا کسی اور کی۔",
+    help_admin_title:"عملے کے اکاؤنٹس کا انتظام (صرف Super Admin)",
+    help_admin_intro:"یہ صرف سب کا کردار دکھانے کے لیے ہے — یہ خود کسی کو گیلری اپ لوڈ کی اجازت نہیں دیتا، کیونکہ یہ اجازت صرف Super Admin کے پاس ہوتی ہے۔",
+    help_admin_s1:"\"Manage users\" کھول کر ہر اس اسٹاف ممبر کو دیکھیں جس نے سائن اپ کیا ہے، اس کے نام، عہدے، موبائل، CNIC، ای میل، اور کردار کے ساتھ۔",
+    help_admin_s2:"کسی نام کے سامنے \"سوٹ میں تبدیل کریں\" کھول کر سوٹ کے Admin Controls میں جائیں، جہاں کردار اصل میں تبدیل ہوتا ہے۔ گیلری اپ لوڈ/انتظام کی اجازت ہمیشہ Super Admin کردار کے ساتھ ہی آتی ہے — یہ یہاں الگ سے مقرر نہیں کی جاتی۔",
+    help_admin_s3:"کسی کی رسائی مکمل طور پر ختم کرنے کے لیے یہ سوٹ کے Admin Controls سے کریں — ان کا اکاؤنٹ تمام کیمپ آفس سسٹمز میں مشترکہ ہے، اسے صرف یہاں سے حذف نہیں کرنا چاہیے۔",
     help_faqTitle:"اکثر پوچھے جانے والے سوالات",
-    help_faq1_q:"میں نے سائن اپ کر لیا لیکن \"تصویر اپ لوڈ کریں\" کا بٹن غیر فعال ہے — کیوں؟",
-    help_faq1_a:"نئے اکاؤنٹس حفاظت کی خاطر \"Guest (زیر التوا)\" کے طور پر شروع ہوتے ہیں۔ اپ لوڈ کرنے کے لیے کسی Administrator کو \"Manage users\" سے آپ کو \"Staff\" کے طور پر منظور کرنا ہوگا۔",
-    help_faq2_q:"Guest، Staff، اور Administrator میں کیا فرق ہے؟",
-    help_faq2_a:"Guest (زیر التوا) صرف گیلری دیکھ سکتا ہے۔ Staff تصاویر اپ لوڈ اور اپنی تصاویر حذف بھی کر سکتا ہے۔ Administrator ہر کام کر سکتا ہے، بشمول اکاؤنٹس منظور کرنا، کسی کا بھی کردار تبدیل کرنا، اور کوئی بھی تصویر حذف کرنا۔",
+    help_faq1_q:"میں نے سائن اپ کر لیا لیکن \"تصویر اپ لوڈ کریں\" کا بٹن نظر نہیں آ رہا — کیوں؟",
+    help_faq1_a:"اس گیلری میں اپ لوڈ صرف Super Admin اکاؤنٹ کر سکتا ہے۔ کسی اور کردار کو — عام Admin سمیت — یہاں اپ لوڈ کی اجازت نہیں دی جا سکتی۔",
+    help_faq2_q:"Viewer، Data Entry، Admin، اور Super Admin میں یہاں کیا فرق ہے؟",
+    help_faq2_a:"اس گیلری میں صرف Super Admin اپ لوڈ کر سکتا، کوئی بھی تصویر حذف کر سکتا، اور اکاؤنٹس کا انتظام کر سکتا ہے۔ Viewer، Data Entry، اور عام Admin سب گیلری اور اسٹاف ڈائریکٹری دیکھ سکتے ہیں، مگر ان میں سے کوئی اپ لوڈ یا حذف نہیں کر سکتا۔",
     help_faq3_q:"کیا میں کسی اور کی تصویر حذف کر سکتا ہوں؟",
-    help_faq3_a:"صرف Administrator ہی کسی اور کی اپ لوڈ کردہ تصویر حذف کر سکتا ہے۔ Staff صرف اپنی اپ لوڈ کردہ تصاویر ہی حذف کر سکتا ہے۔",
+    help_faq3_a:"صرف Super Admin ہی کوئی تصویر حذف کر سکتا ہے، بشمول کسی اور کی اپ لوڈ کردہ۔",
     help_faq4_q:"میں انگریزی اور اردو کے درمیان کیسے تبدیل کروں؟",
     help_faq4_a:"اسکرین کے اوپر زبان منتخب کرنے والا خانہ استعمال کریں۔ یہ ہر شخص کی اپنی اسکرین کے مینو، لیبل، اور بٹن فوراً تبدیل کر دیتا ہے۔",
     help_faq5_q:"تصاویر کہاں محفوظ ہیں — اگر یہ کمپیوٹر خراب ہو جائے تو کیا میرا ڈیٹا محفوظ ہے؟",
@@ -1094,7 +1101,7 @@ auth.onAuthStateChanged(function(user){
     }
     var d = doc.data();
     var globalRole = (d.roleV2==="admin" || d.roleV2==="super_admin") ? "admin" : "guest"; /* roleV2 is the one true source now -- a stale legacy "role" field on the doc must never override it */
-    var effectiveGalleryStatus = (globalRole === "admin") ? "admin" : (d.galleryStatus || "pending");
+    var effectiveGalleryStatus = (d.roleV2==="super_admin") ? "admin" : "pending"; /* derived from roleV2 only -- ONLY the Super Admin can upload/manage photos here; everyone else (Admin, Data Entry, Viewer) is view-only, per explicit instruction */
     CURRENT_USER = { uid:user.uid, email:user.email, name:d.name||"", designation:d.designation||"", mobile:d.mobile||"", cnic:d.cnic||"", role:globalRole, galleryStatus:effectiveGalleryStatus, photoURL:d.photoURL||null, isSuperAdmin:(d.roleV2==="super_admin") };
     if(d.theme) applyTheme(d.theme);
     function revealGalleryApp(){
@@ -1508,7 +1515,7 @@ document.getElementById("helpCloseBtn").addEventListener("click", function(){
 function applyRoleUI(){
   if(!CURRENT_USER) return;
   document.getElementById("whoAmI").textContent = (CURRENT_USER.name || (CURRENT_USER.email? CURRENT_USER.email.split("@")[0] : "")) + (CURRENT_USER.designation? (" — "+CURRENT_USER.designation) : "");
-  document.getElementById("roleChip").textContent = t(CURRENT_USER.galleryStatus==="admin"? "role_admin" : CURRENT_USER.galleryStatus==="staff"? "role_user" : "role_guest");
+  document.getElementById("roleChip").textContent = t(CURRENT_USER.galleryStatus==="admin"? "role_admin" : "role_guest"); /* only Super Admin gets "admin" now -- no "staff" tier anymore */
   document.body.classList.toggle("guest-mode", CURRENT_USER.galleryStatus === "pending");
   document.getElementById("uploadOpenBtn").style.display = (CURRENT_USER.galleryStatus === "pending") ? "none" : "";
   document.getElementById("adminPanelBtn").style.display = (CURRENT_USER.isSuperAdmin === true) ? "" : "none"; /* Managing gallery accounts is now Super Admin-only, not every gallery "admin" -- keeps user management in one place */
@@ -1671,8 +1678,15 @@ function loadAdminUsers(){
     snap.forEach(function(doc){ rows.push(Object.assign({uid:doc.id}, doc.data())); });
     rows.sort(function(a,b){ return (a.name||"").localeCompare(b.name||""); });
     body.innerHTML = rows.map(function(u){
-      var uIsGlobalAdmin = (u.roleV2==="admin" || u.roleV2==="super_admin");
-      var uGalleryStatus = uIsGlobalAdmin ? "admin" : (u.galleryStatus || "pending");
+      /* roleV2 is the one true source now -- shown here with the EXACT same
+         label as the Suite's central Admin Controls panel, so this panel can
+         never again disagree with it for the same account. Role changes
+         (and, with them, gallery upload access) are made from the Suite only. */
+      var uRoleV2 = u.roleV2 || "viewer";
+      var uRoleKey = (uRoleV2==="super_admin") ? "gr_role_super_admin"
+                   : (uRoleV2==="admin") ? "gr_role_admin"
+                   : (uRoleV2==="data_entry") ? "gr_role_data_entry"
+                   : "gr_role_viewer";
       var initial = (u.name||"?").trim().charAt(0).toUpperCase() || "?";
       var avatarHtml = u.photoURL
         ? "<img src='"+esc(u.photoURL)+"' alt='' style='width:32px;height:32px;border-radius:50%;object-fit:cover;display:block;'>"
@@ -1684,36 +1698,10 @@ function loadAdminUsers(){
         "<td>"+esc(u.mobile)+"</td>"+
         "<td>"+esc(u.cnic)+"</td>"+
         "<td>"+esc(u.email)+"</td>"+
-        "<td><select class='role-select' data-role-for='"+esc(u.uid)+"'"+(uIsGlobalAdmin?" disabled title='Global Administrator — change from any system\\'s admin panel'":"")+">"+
-          "<option value='pending'"+(uGalleryStatus==="pending"?" selected":"")+">"+esc(t("role_guest"))+"</option>"+
-          "<option value='staff'"+(uGalleryStatus==="staff"?" selected":"")+">"+esc(t("role_user"))+"</option>"+
-          "<option value='admin'"+(uGalleryStatus==="admin"?" selected":"")+">"+esc(t("role_admin"))+"</option>"+
-        "</select></td>"+
-        "<td><button class='btn ghost small' data-remove='"+esc(u.uid)+"'"+(uIsGlobalAdmin?" disabled":"")+">"+esc(t("btn_remove"))+"</button></td>"+
+        "<td>"+esc(t(uRoleKey))+"</td>"+
+        "<td><a href='https://cmpofficepgp.org/camp-office-suite/' target='_blank' rel='noopener'>"+esc(t("admin_changeInSuite"))+"</a></td>"+
         "</tr>";
     }).join("") || "<tr><td colspan='8'>No accounts yet.</td></tr>";
-    body.querySelectorAll("[data-role-for]").forEach(function(sel){
-      sel.addEventListener("change", function(){
-        var uid = sel.getAttribute("data-role-for");
-        db.collection("users").doc(uid).update({ galleryStatus: sel.value }).then(function(){
-          toast("Role updated.");
-        }).catch(function(err){ toast("Could not update role: " + err.message); });
-      });
-    });
-    body.querySelectorAll("[data-remove]").forEach(function(btn){
-      btn.addEventListener("click", function(){
-        var uid = btn.getAttribute("data-remove");
-        if(uid === CURRENT_USER.uid){ toast("You cannot remove your own access."); return; }
-        // NOTE (unified project): users/{uid} is now the SHARED profile across all
-        // 4 systems, so this can no longer delete the whole document — that would
-        // also remove the person's access to Bill Register, Case Notice and DCMS.
-        // Instead it only revokes THIS system's access, back to "pending".
-        if(!confirm("Remove this person's access to the gallery? Their account and access to the other camp-office systems is not affected — this only sets them back to \"pending\" here.")) return;
-        db.collection("users").doc(uid).update({ galleryStatus: "pending" }).then(function(){
-          toast("Gallery access removed."); loadAdminUsers();
-        }).catch(function(err){ toast("Could not remove: " + err.message); });
-      });
-    });
   }).catch(function(err){
     body.innerHTML = "<tr><td colspan='8'>Could not load: "+esc(err.message)+"</td></tr>";
   });
