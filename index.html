@@ -1090,9 +1090,9 @@ auth.onAuthStateChanged(function(user){
       return;
     }
     var d = doc.data();
-    var globalRole = d.role || ((d.roleV2==="admin" || d.roleV2==="super_admin") ? "admin" : "guest");
+    var globalRole = (d.roleV2==="admin" || d.roleV2==="super_admin") ? "admin" : "guest"; /* roleV2 is the one true source now -- a stale legacy "role" field on the doc must never override it */
     var effectiveGalleryStatus = (globalRole === "admin") ? "admin" : (d.galleryStatus || "pending");
-    CURRENT_USER = { uid:user.uid, email:user.email, name:d.name||"", designation:d.designation||"", mobile:d.mobile||"", cnic:d.cnic||"", role:globalRole, galleryStatus:effectiveGalleryStatus, photoURL:d.photoURL||null };
+    CURRENT_USER = { uid:user.uid, email:user.email, name:d.name||"", designation:d.designation||"", mobile:d.mobile||"", cnic:d.cnic||"", role:globalRole, galleryStatus:effectiveGalleryStatus, photoURL:d.photoURL||null, isSuperAdmin:(d.roleV2==="super_admin") };
     if(d.theme) applyTheme(d.theme);
     function revealGalleryApp(){
       showApp();
@@ -1508,7 +1508,7 @@ function applyRoleUI(){
   document.getElementById("roleChip").textContent = t(CURRENT_USER.galleryStatus==="admin"? "role_admin" : CURRENT_USER.galleryStatus==="staff"? "role_user" : "role_guest");
   document.body.classList.toggle("guest-mode", CURRENT_USER.galleryStatus === "pending");
   document.getElementById("uploadOpenBtn").style.display = (CURRENT_USER.galleryStatus === "pending") ? "none" : "";
-  document.getElementById("adminPanelBtn").style.display = (CURRENT_USER.galleryStatus === "admin") ? "" : "none";
+  document.getElementById("adminPanelBtn").style.display = (CURRENT_USER.isSuperAdmin === true) ? "" : "none"; /* Managing gallery accounts is now Super Admin-only, not every gallery "admin" -- keeps user management in one place */
 }
 
 /* ---------------- Gallery ---------------- */
@@ -1653,6 +1653,7 @@ viewerModal.addEventListener("click", function(e){ if(e.target === viewerModal) 
 /* ---------------- Admin: manage users ---------------- */
 var adminModal = document.getElementById("adminModal");
 document.getElementById("adminPanelBtn").addEventListener("click", function(){
+  if(!CURRENT_USER || CURRENT_USER.isSuperAdmin !== true){ toast("Only a Super Admin can manage accounts here."); return; }
   loadAdminUsers();
   adminModal.classList.add("show");
 });
@@ -1667,7 +1668,8 @@ function loadAdminUsers(){
     snap.forEach(function(doc){ rows.push(Object.assign({uid:doc.id}, doc.data())); });
     rows.sort(function(a,b){ return (a.name||"").localeCompare(b.name||""); });
     body.innerHTML = rows.map(function(u){
-      var uGalleryStatus = (u.role==="admin") ? "admin" : (u.galleryStatus || "pending");
+      var uIsGlobalAdmin = (u.roleV2==="admin" || u.roleV2==="super_admin");
+      var uGalleryStatus = uIsGlobalAdmin ? "admin" : (u.galleryStatus || "pending");
       var initial = (u.name||"?").trim().charAt(0).toUpperCase() || "?";
       var avatarHtml = u.photoURL
         ? "<img src='"+esc(u.photoURL)+"' alt='' style='width:32px;height:32px;border-radius:50%;object-fit:cover;display:block;'>"
@@ -1679,12 +1681,12 @@ function loadAdminUsers(){
         "<td>"+esc(u.mobile)+"</td>"+
         "<td>"+esc(u.cnic)+"</td>"+
         "<td>"+esc(u.email)+"</td>"+
-        "<td><select class='role-select' data-role-for='"+esc(u.uid)+"'"+(u.role==="admin"?" disabled title='Global Administrator — change from any system\\'s admin panel'":"")+">"+
+        "<td><select class='role-select' data-role-for='"+esc(u.uid)+"'"+(uIsGlobalAdmin?" disabled title='Global Administrator — change from any system\\'s admin panel'":"")+">"+
           "<option value='pending'"+(uGalleryStatus==="pending"?" selected":"")+">"+esc(t("role_guest"))+"</option>"+
           "<option value='staff'"+(uGalleryStatus==="staff"?" selected":"")+">"+esc(t("role_user"))+"</option>"+
           "<option value='admin'"+(uGalleryStatus==="admin"?" selected":"")+">"+esc(t("role_admin"))+"</option>"+
         "</select></td>"+
-        "<td><button class='btn ghost small' data-remove='"+esc(u.uid)+"'"+(u.role==="admin"?" disabled":"")+">"+esc(t("btn_remove"))+"</button></td>"+
+        "<td><button class='btn ghost small' data-remove='"+esc(u.uid)+"'"+(uIsGlobalAdmin?" disabled":"")+">"+esc(t("btn_remove"))+"</button></td>"+
         "</tr>";
     }).join("") || "<tr><td colspan='8'>No accounts yet.</td></tr>";
     body.querySelectorAll("[data-role-for]").forEach(function(sel){
