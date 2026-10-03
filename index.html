@@ -814,7 +814,7 @@ var I18N_UI = {
     admin_changeInSuite:"Change in Suite →",
     lbl_mobile:"Mobile number", lbl_cnic:"CNIC number", lbl_profilePic:"Profile picture (optional)",
     th_name:"Name", th_designation:"Designation", th_mobile:"Mobile", th_cnic:"CNIC", th_email:"Email", th_role:"Role",
-    role_guest:"Guest (pending)", role_user:"Staff", role_admin:"Administrator",
+    role_guest:"Guest (pending)", role_user:"Staff", role_admin:"Administrator", role_superAdmin:"Super Admin",
     gr_role_viewer:"Viewer", gr_role_data_entry:"Data Entry", gr_role_admin:"Admin", gr_role_super_admin:"Super Admin",
     btn_remove:"Remove access",
 
@@ -893,7 +893,7 @@ var I18N_UI = {
     admin_changeInSuite:"سوٹ میں تبدیل کریں ←",
     lbl_mobile:"موبائل نمبر", lbl_cnic:"شناختی کارڈ نمبر (CNIC)", lbl_profilePic:"پروفائل تصویر (اختیاری)",
     th_name:"نام", th_designation:"عہدہ", th_mobile:"موبائل", th_cnic:"CNIC", th_email:"ای میل", th_role:"کردار",
-    role_guest:"Guest (زیر التوا)", role_user:"Staff", role_admin:"Administrator",
+    role_guest:"Guest (زیر التوا)", role_user:"Staff", role_admin:"Administrator", role_superAdmin:"سپر ایڈمن",
     gr_role_viewer:"ناظر", gr_role_data_entry:"ڈیٹا انٹری", gr_role_admin:"ایڈمن", gr_role_super_admin:"سپر ایڈمن",
     btn_remove:"رسائی ختم کریں",
 
@@ -1542,7 +1542,11 @@ document.getElementById("helpCloseBtn").addEventListener("click", function(){
 function applyRoleUI(){
   if(!CURRENT_USER) return;
   document.getElementById("whoAmI").textContent = (CURRENT_USER.name || (CURRENT_USER.email? CURRENT_USER.email.split("@")[0] : "")) + (CURRENT_USER.designation? (" — "+CURRENT_USER.designation) : "");
-  document.getElementById("roleChip").textContent = t(CURRENT_USER.galleryStatus==="admin"? "role_admin" : "role_guest"); /* only Super Admin gets "admin" now -- no "staff" tier anymore */
+  /* (3 Oct 2026) Only Super Admin gets the gallery's "admin" tier now (no plain-admin
+     tier exists here anymore), so show "Super Admin" specifically instead of the more
+     generic "Administrator" label -- matches what the other systems now show for the
+     same account, instead of this one looking different. */
+  document.getElementById("roleChip").textContent = t(CURRENT_USER.galleryStatus==="admin"? (CURRENT_USER.isSuperAdmin? "role_superAdmin" : "role_admin") : "role_guest");
   document.body.classList.toggle("guest-mode", CURRENT_USER.galleryStatus === "pending");
   document.getElementById("uploadOpenBtn").style.display = (CURRENT_USER.galleryStatus === "pending") ? "none" : "";
   document.getElementById("adminPanelBtn").style.display = (CURRENT_USER.isSuperAdmin === true) ? "" : "none"; /* Managing gallery accounts is now Super Admin-only, not every gallery "admin" -- keeps user management in one place */
