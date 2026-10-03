@@ -785,7 +785,7 @@ var I18N_UI = {
     auth_yourEmail:"Your email", auth_password:"Password", auth_confirmPassword:"Confirm password",
     auth_createAccountBtn:"Create account", auth_backToSignin:"Back to sign in",
     auth_warnText:"Photos and profile data are stored online in this system's shared Firebase database, visible only to signed-in staff.",
-    auth_signin:"Sign in", app_subtitle:"Camp Office Gallery & Staff Directory",
+    auth_signin:"Sign in", auth_signingIn:"Signing in…", app_subtitle:"Camp Office Gallery & Staff Directory",
     auth_email:"Email", auth_createNewAccount:"Create a new account", auth_forgotPassword:"Forgot password?",
     app_title:"Camp Office Gallery",
     app_subtitle2:"Camp Office Prosecutor General Punjab, Supreme Court of Pakistan, Islamabad",
@@ -864,7 +864,7 @@ var I18N_UI = {
     auth_yourEmail:"آپ کا ای میل", auth_password:"پاسورڈ", auth_confirmPassword:"پاسورڈ دوبارہ لکھیں",
     auth_createAccountBtn:"اکاؤنٹ بنائیں", auth_backToSignin:"واپس سائن ان",
     auth_warnText:"تصاویر اور پروفائل ڈیٹا اس سسٹم کے مشترکہ Firebase ڈیٹابیس میں آن لائن محفوظ ہوتا ہے، صرف سائن ان عملہ ہی دیکھ سکتا ہے۔",
-    auth_signin:"سائن ان", app_subtitle:"کیمپ آفس گیلری اور اسٹاف ڈائریکٹری",
+    auth_signin:"سائن ان", auth_signingIn:"سائن اِن ہو رہا ہے…", app_subtitle:"کیمپ آفس گیلری اور اسٹاف ڈائریکٹری",
     auth_email:"ای میل", auth_createNewAccount:"نیا اکاؤنٹ بنائیں", auth_forgotPassword:"پاسورڈ بھول گئے؟",
     app_title:"کیمپ آفس گیلری",
     app_subtitle2:"کیمپ آفس پراسیکیوٹر جنرل پنجاب، سپریم کورٹ آف پاکستان، اسلام آباد",
@@ -1085,12 +1085,18 @@ document.getElementById("setupBtn").addEventListener("click", function(){
 });
 
 document.getElementById("loginBtn").addEventListener("click", function(){
+  var btn = document.getElementById("loginBtn");
+  if(btn.disabled) return; /* guard against double-clicks while a sign-in is already in progress */
   var email = document.getElementById("login_username").value.trim();
   var pass = document.getElementById("login_password").value;
   var errEl = document.getElementById("loginError");
   errEl.textContent = "";
   if(!email || !pass){ errEl.textContent = "Please enter your email and password."; return; }
-  auth.signInWithEmailAndPassword(email, pass).catch(function(err){ errEl.textContent = err.message; });
+  btn.disabled = true; btn.textContent = t("auth_signingIn"); /* visible feedback so the button never looks stuck/frozen */
+  auth.signInWithEmailAndPassword(email, pass).catch(function(err){
+    errEl.textContent = err.message;
+    btn.disabled = false; btn.textContent = t("auth_signin");
+  });
 });
 
 document.getElementById("signOutBtn").addEventListener("click", function(){ auth.signOut(); });
