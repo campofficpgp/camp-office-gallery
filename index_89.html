@@ -1,0 +1,1781 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Camp Office Gallery</title>
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<script>
+  /* Apply the signed-in user's chosen theme immediately (before CSS paints) to avoid a flash of the wrong colors.
+     The real source of truth is Firestore (users/{uid}.theme, set after login below); this is just the last-seen value. */
+  (function(){
+    var t = "navy";
+    try{ var saved = localStorage.getItem("campOfficeTheme"); if(saved) t = saved; }catch(e){}
+    document.documentElement.setAttribute("data-theme", t);
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@400;700&family=Merriweather:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<!-- Sends the super-admin security code by email (see "Super Admin Email OTP Gate" below) -->
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<style>
+html,body{overflow-x:hidden;}
+
+  :root{
+    --navy:#1F4E78;
+    --navy-dark:#153A5B;
+    --navy-tint:#EAF0F5;
+    --amber:#B8860B;
+    --amber-tint:#FBF3DF;
+    --bg:#F4F3EF;
+    --surface:#FFFFFF;
+    --border:#DBD7CE;
+    --border-strong:#BEC7CE;
+    --text:#22303C;
+    --muted:#5B6B76;
+    --danger:#B3261E;
+    --danger-tint:#FBEAE9;
+    --success:#2F7D4F;
+    --success-tint:#EAF4EE;
+    --radius:8px;
+    --shadow:0 1px 2px rgba(21,58,91,0.08), 0 1px 1px rgba(21,58,91,0.04);
+  }
+
+  :root{ --sidebar-bg:#17294a; --sidebar-bg2:#223c72; --sidebar-text:#e4e9f5; --sidebar-muted:#9caed0; --font-head:"Segoe UI",Tahoma,Arial,sans-serif; }
+
+  /* ===== Per-user selectable themes. Same variable names as :root above are just
+     redefined per theme, so every existing rule that already uses var(--navy) etc.
+     repaints automatically — nothing else in this file needs to change. ===== */
+  [data-theme="navy"]{
+    --navy:#1F4E78; --navy-dark:#153A5B; --navy-tint:#EAF0F5;
+    --amber:#B8860B; --amber-tint:#FBF3DF;
+    --bg:#F4F3EF; --surface:#FFFFFF; --border:#DBD7CE; --border-strong:#BEC7CE;
+    --text:#22303C; --muted:#5B6B76;
+    --shadow:0 1px 2px rgba(21,58,91,0.08), 0 1px 1px rgba(21,58,91,0.04);
+  }
+  [data-theme="green"]{
+    --navy:#0F5132; --navy-dark:#0B3B24; --navy-tint:#E7F0EA;
+    --amber:#C9A227; --amber-tint:#FBF3D9;
+    --bg:#F4F6F4; --surface:#FFFFFF; --border:#D9E1DB; --border-strong:#BFD1C5;
+    --text:#1B2420; --muted:#54655B;
+    --shadow:0 1px 2px rgba(11,59,36,0.08), 0 1px 1px rgba(11,59,36,0.04);
+  }
+  [data-theme="ivory"]{
+    --navy:#7A1F2B; --navy-dark:#5C1620; --navy-tint:#F3E6E4;
+    --amber:#4A3527; --amber-tint:#EFE7D4;
+    --bg:#F4EFE3; --surface:#FBF7EE; --border:#E3D8BE; --border-strong:#CBB98F;
+    --text:#2E2A22; --muted:#8A7A5F;
+    --shadow:0 1px 2px rgba(92,22,32,0.08), 0 1px 1px rgba(92,22,32,0.04);
+  }
+  [data-theme="teal"]{
+    --navy:#0B7A75; --navy-dark:#075753; --navy-tint:#E3F3F2;
+    --amber:#8A6A12; --amber-tint:#FBEBD0;
+    --bg:#F2F7F6; --surface:#FFFFFF; --border:#D8E9E7; --border-strong:#B9D6D2;
+    --text:#1E2A2A; --muted:#54696A;
+    --shadow:0 1px 2px rgba(7,87,83,0.08), 0 1px 1px rgba(7,87,83,0.04);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:"Segoe UI", system-ui, -apple-system, "Noto Sans", Arial, sans-serif;
+    font-size:14px;
+    line-height:1.45;
+  }
+  h1,h2,h3{font-family:Georgia,"Times New Roman",serif;font-weight:700;margin:0;color:var(--navy-dark);}
+  body.lang-ur label, body.lang-ur h1, body.lang-ur h2, body.lang-ur h3, body.lang-ur .btn,
+  body.lang-ur button, body.lang-ur .field-hint, body.lang-ur .auth-sub, body.lang-ur .auth-warn,
+  body.lang-ur .guest-banner, body.lang-ur .gphoto .meta, body.lang-ur .modal h3, body.lang-ur th{
+    font-family:"Noto Nastaliq Urdu","Jameel Noori Nastaleeq","Noto Naskh Arabic",Tahoma,Arial,sans-serif;
+  }
+
+  /* ---------- Top bar ---------- */
+  .topbar{
+    background:linear-gradient(180deg,var(--navy) 0%, var(--navy-dark) 100%);
+    color:#fff;padding:18px 24px;display:flex;flex-wrap:wrap;align-items:center;
+    justify-content:space-between;gap:12px;border-bottom:3px solid var(--amber);
+  }
+  .topbar h1{color:#fff;font-size:20px;letter-spacing:.2px;}
+  .topbar .sub{color:#CFE0EC;font-size:12.5px;margin-top:2px;}
+  .userbar{display:flex;align-items:center;gap:10px;color:#fff;font-size:13px;flex-wrap:wrap;}
+  .userbar .role-chip{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.35);border-radius:20px;padding:3px 12px;font-size:12px;}
+  select#uiLangSelect{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:6px;padding:5px 8px;font-size:12.5px;}
+  select#uiLangSelect option{color:#111;}
+  select#themeSwitcher{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:6px;padding:5px 8px;font-size:12.5px;}
+  select#themeSwitcher option{color:#111;}
+
+  main{width:100%;min-width:0;max-width:1200px;margin:0 auto;padding:20px 24px 60px;}
+
+  .guest-banner{display:none;background:var(--amber-tint);color:#7a5a00;border:1px solid var(--amber);border-radius:var(--radius);padding:12px 16px;margin-bottom:18px;font-size:13.5px;}
+  body.guest-mode .guest-banner{display:block;}
+
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:18px;}
+  .count-chip{background:var(--navy-tint);color:var(--navy-dark);border-radius:20px;padding:5px 14px;font-size:12.5px;}
+
+  button.btn{
+    background:var(--navy);color:#fff;border:none;border-radius:var(--radius);
+    padding:9px 18px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;
+  }
+  button.btn:hover{background:var(--navy-dark);}
+  button.btn.ghost{background:transparent;color:var(--navy);border:1px solid var(--border-strong);}
+  button.btn.ghost:hover{background:var(--navy-tint);}
+  button.btn.danger{background:var(--danger);}
+  button.btn.danger:hover{background:#8f1e18;}
+  button.btn:disabled{opacity:.5;cursor:not-allowed;}
+  button.btn.small{padding:5px 12px;font-size:12px;}
+
+  .field{margin-bottom:14px;}
+  .field label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:4px;}
+  .field input,.field select,.field textarea{
+    width:100%;padding:9px 11px;border:1px solid var(--border-strong);border-radius:var(--radius);
+    font-size:14px;font-family:inherit;box-sizing:border-box;
+  }
+  .field-hint{font-size:12px;color:var(--muted);margin-top:4px;}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px 18px;margin-bottom:18px;}
+  .card h3{font-size:13px;font-family:inherit;text-transform:uppercase;letter-spacing:.05em;color:var(--navy);margin-bottom:12px;font-weight:700;}
+
+  /* ---------- Auth screens ---------- */
+  .fullscreen-overlay{position:fixed;inset:0;background:linear-gradient(160deg,var(--navy) 0%, var(--navy-dark) 100%);display:flex;align-items:center;justify-content:center;z-index:500;padding:20px;}
+  .auth-card{background:var(--surface);border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.35);padding:32px 30px;width:100%;max-width:400px;}
+  .auth-sub{font-size:13px;color:var(--muted);margin:6px 0 18px;line-height:1.7;}
+  .auth-error{color:var(--danger);font-size:12.5px;min-height:16px;margin-top:6px;}
+  .auth-warn{margin-top:16px;font-size:12px;color:var(--muted);background:var(--navy-tint);padding:10px 12px;border-radius:var(--radius);line-height:1.7;}
+
+  /* ---------- Gallery grid ---------- */
+  .gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:16px;}
+  .gphoto{position:relative;border-radius:var(--radius);overflow:hidden;aspect-ratio:1/1;background:#dfe3e6;cursor:pointer;box-shadow:var(--shadow);border:1px solid var(--border);}
+  .gphoto img{width:100%;height:100%;object-fit:cover;display:block;}
+  .gphoto .meta{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(transparent,rgba(10,20,30,.82));color:#fff;padding:20px 9px 7px;font-size:11px;line-height:1.5;}
+  .gphoto .meta b{display:block;font-size:12px;}
+  .gphoto .del-btn{position:absolute;top:6px;right:6px;background:rgba(179,38,30,.88);color:#fff;border:none;border-radius:50%;width:26px;height:26px;cursor:pointer;font-size:14px;line-height:1;display:none;}
+  .gphoto:hover .del-btn{display:block;}
+  .empty-state{text-align:center;color:var(--muted);padding:60px 20px;font-size:14px;}
+
+  /* ---------- Modals ---------- */
+  .modal-overlay{position:fixed;inset:0;background:rgba(10,20,30,.6);display:none;align-items:center;justify-content:center;z-index:900;padding:20px;}
+  .modal-overlay.show{display:flex;}
+  .modal{background:#fff;border-radius:12px;padding:26px 28px;max-width:460px;width:100%;max-height:86vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.35);}
+  .modal.wide{max-width:900px;}
+  .modal h3{margin-bottom:14px;font-size:17px;}
+  .modal .actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;}
+  .viewer-img{max-width:100%;max-height:70vh;display:block;margin:0 auto 14px;border-radius:6px;}
+  .viewer-meta{font-size:13px;color:var(--muted);text-align:center;line-height:1.7;}
+
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th,td{padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;}
+  th{color:var(--muted);font-weight:600;font-size:12px;}
+  .role-select{padding:5px 8px;border-radius:6px;border:1px solid var(--border-strong);font-size:12.5px;}
+
+  footer.appfoot{text-align:center;color:var(--muted);font-size:11.5px;padding:18px;border-top:1px solid var(--border);}
+  .toast{position:fixed;bottom:20px;right:20px;background:var(--navy-dark);color:#fff;padding:11px 18px;border-radius:var(--radius);box-shadow:0 4px 14px rgba(0,0,0,.25);font-size:13px;z-index:999;opacity:0;transform:translateY(8px);transition:.25s;pointer-events:none;max-width:340px;}
+  .toast.show{opacity:1;transform:translateY(0);}
+
+  /* ---------- Help / Guide overlay ---------- */
+  .help-shell{background:#fff;width:100%;max-width:960px;max-height:92vh;overflow:auto;border-radius:8px;box-shadow:0 12px 40px rgba(0,0,0,.4);}
+  .help-toolbar{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-bottom:1px solid var(--border);background:#F7F6F3;position:sticky;top:0;z-index:2;}
+  .help-toolbar h2{font-size:17px;}
+  .help-body{padding:22px 26px 30px;}
+  .help-intro{font-size:13.5px;color:var(--text);line-height:1.6;margin:0 0 4px;}
+  .help-steps{margin:0;padding-left:20px;}
+  .help-steps li{margin-bottom:7px;font-size:13px;line-height:1.55;color:var(--text);}
+  .help-steps li:last-child{margin-bottom:0;}
+  details.faq-item{border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px;background:#fff;}
+  details.faq-item summary{padding:11px 14px;cursor:pointer;font-weight:600;font-size:13.2px;color:var(--navy-dark);list-style:none;position:relative;padding-right:30px;}
+  details.faq-item summary::-webkit-details-marker{display:none;}
+  details.faq-item summary::after{content:"+";position:absolute;right:14px;top:9px;font-size:17px;color:var(--muted);}
+  details.faq-item[open] summary::after{content:"\2212";}
+  details.faq-item summary:hover{background:var(--navy-tint);}
+  details.faq-item .faq-answer{padding:0 14px 13px;font-size:13px;line-height:1.6;color:var(--text);}
+
+  /* ---------- Team Chat ---------- */
+  #chatToggleBtn{
+    position:fixed;right:20px;bottom:20px;z-index:996;
+    width:52px;height:52px;border-radius:50%;background:var(--navy);color:#fff;
+    border:none;box-shadow:0 4px 14px rgba(0,0,0,.28);cursor:pointer;
+    display:flex;align-items:center;justify-content:center;font-size:22px;padding:0;
+  }
+  #chatToggleBtn:hover{background:var(--navy-dark);}
+  #chatToggleBtn .chat-badge{
+    position:absolute;top:-3px;right:-3px;background:var(--danger);color:#fff;
+    border-radius:999px;min-width:19px;height:19px;font-size:11px;font-weight:700;
+    display:flex;align-items:center;justify-content:center;padding:0 4px;
+  }
+  #chatPanel{
+    position:fixed;top:0;right:-340px;width:320px;height:100%;background:#fff;
+    border-left:1px solid var(--border);box-shadow:-4px 0 18px rgba(0,0,0,.15);
+    z-index:1000;display:flex;flex-direction:column;transition:right .25s ease;
+  }
+  #chatPanel.open{right:0;}
+  .chat-head{background:var(--navy);color:#fff;padding:14px 16px;display:flex;justify-content:space-between;align-items:flex-start;flex:0 0 auto;}
+  .chat-head h3{color:#fff;font-size:14px;margin:0;text-transform:none;letter-spacing:0;font-family:inherit;}
+  .chat-head .chat-online{font-size:11px;color:#CFE0EC;margin-top:3px;}
+  .chat-head button{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:6px;width:26px;height:26px;cursor:pointer;font-size:14px;line-height:1;flex:0 0 auto;}
+  .chat-head button:hover{background:rgba(255,255,255,.28);}
+  .chat-messages{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px;background:var(--bg);}
+  .chat-msg{max-width:88%;}
+  .chat-msg .chat-msg-meta{font-size:10.5px;color:var(--muted);margin-bottom:2px;}
+  .chat-msg .chat-msg-bubble{background:#fff;border:1px solid var(--border);border-radius:10px;padding:7px 10px;font-size:12.8px;line-height:1.45;color:var(--text);word-wrap:break-word;white-space:pre-wrap;}
+  .chat-msg.mine{align-self:flex-end;}
+  .chat-msg.mine .chat-msg-bubble{background:var(--navy-tint);border-color:#C9DCEA;}
+  .chat-msg.mine .chat-msg-meta{text-align:right;}
+  .chat-empty{color:var(--muted);font-size:12.5px;text-align:center;margin-top:30px;}
+  .chat-input-bar{display:flex;flex-direction:column;padding:6px 10px 10px;border-top:1px solid var(--border);background:#fff;flex:0 0 auto;position:relative;}
+  .chat-input-bar textarea{flex:1;resize:none;height:40px;padding:8px 10px;font-size:13px;font-family:inherit;}
+  .chat-input-bar button{border:none;background:var(--navy);color:#fff;border-radius:var(--radius);padding:0 14px;cursor:pointer;font-weight:600;font-family:inherit;}
+  .chat-input-bar button:hover{background:var(--navy-dark);}
+  .chat-toolbar-row{display:flex;gap:2px;align-items:center;}
+  .chat-main-row{display:flex;gap:8px;align-items:center;margin-top:4px;}
+  .chat-icon-btn{border:none;background:transparent;font-size:19px;cursor:pointer;padding:0 2px;line-height:1;flex:0 0 auto;}
+  .chat-icon-btn:hover{opacity:.65;}
+  .chat-emoji-picker{position:absolute;left:10px;bottom:92px;display:none;grid-template-columns:repeat(8,1fr);gap:4px;
+    background:#fff;border:1px solid var(--border);border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.18);padding:8px;
+    max-width:280px;z-index:20;}
+  .chat-emoji-picker.open{display:grid;}
+  .chat-emoji-picker span{cursor:pointer;font-size:18px;text-align:center;border-radius:6px;padding:2px;}
+  .chat-emoji-picker span:hover{background:var(--bg);}
+  .chat-upload-progress{padding:6px 14px;font-size:11.5px;color:var(--muted);background:var(--bg);border-top:1px solid var(--border);flex:0 0 auto;}
+  .chat-msg-file{display:inline-flex;align-items:center;gap:6px;background:var(--bg);border:1px solid var(--border);
+    border-radius:8px;padding:6px 10px;text-decoration:none;color:var(--text);font-size:12.5px;max-width:100%;word-break:break-all;}
+  .chat-msg-file:hover{background:#fff;}
+  .chat-msg-image{max-width:200px;max-height:200px;border-radius:8px;display:block;cursor:pointer;object-fit:cover;}
+  .chat-msg-del{border:none;background:transparent;color:var(--muted);font-size:10.5px;cursor:pointer;padding:2px 0 0;
+    font-family:inherit;text-decoration:underline;}
+  .chat-msg-del:hover{color:var(--danger);}
+  @media(max-width:640px){ #chatPanel{width:100%;right:-100%;} }
+
+  /* ================= New shared dashboard shell (sidebar + topbar2) ================= */
+  .app-shell{ display:flex; min-height:100vh; }
+  .sidebar{ width:230px; flex:none; background:linear-gradient(180deg,var(--sidebar-bg2) 0%, var(--sidebar-bg) 100%); color:var(--sidebar-text); display:flex; flex-direction:column; position:sticky; top:0; height:100vh; overflow-y:auto; transition:width .18s ease, transform .18s ease; z-index:40; }
+  .sidebar-head{ display:flex; align-items:center; justify-content:space-between; padding:14px 12px; border-bottom:1px solid rgba(255,255,255,0.12); }
+  .sidebar-brand{ display:flex; align-items:center; gap:8px; font-weight:700; font-size:13.5px; }
+  .sidebar-collapse-btn{ background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:var(--sidebar-text); width:28px; height:28px; border-radius:6px; cursor:pointer; font-size:13px; flex:none; }
+  .sidebar-nav{ padding:8px 7px; flex:1; }
+  .nav-item, .nav-group-head{ display:flex; align-items:center; gap:9px; width:100%; padding:9px 9px; border-radius:7px; color:var(--sidebar-text); text-decoration:none; font-size:12.5px; font-weight:600; background:none; border:none; cursor:pointer; text-align:left; margin-bottom:2px; font-family:var(--font-head); }
+  .nav-item:hover, .nav-group-head:hover{ background:rgba(255,255,255,0.09); }
+  .nav-item.active{ background:rgba(255,255,255,0.16); }
+  .nav-item .ico, .nav-group-head .ico{ width:18px; text-align:center; flex:none; }
+  .nav-group-head .chev{ margin-left:auto; transition:transform .15s; font-size:11px; }
+  .nav-group.open .nav-group-head .chev{ transform:rotate(90deg); }
+  .nav-submenu{ max-height:0; overflow:hidden; transition:max-height .18s ease; padding-left:12px; }
+  .nav-group.open .nav-submenu{ max-height:220px; }
+  .nav-subitem{ display:flex; align-items:center; gap:8px; padding:7px 9px; font-size:12px; color:var(--sidebar-muted); text-decoration:none; border-radius:6px; cursor:pointer; background:none; border:none; width:100%; text-align:left; font-family:inherit; }
+  .nav-subitem:hover, .nav-subitem.active{ background:rgba(255,255,255,0.09); color:var(--sidebar-text); }
+  .sidebar-foot{ border-top:1px solid rgba(255,255,255,0.12); padding:8px 7px 14px; display:flex; flex-direction:column; gap:2px; }
+  .sidebar-foot a{ display:flex; align-items:center; gap:9px; padding:7px 9px; border-radius:7px; color:var(--sidebar-muted); text-decoration:none; font-size:11.5px; }
+  .sidebar-foot a:hover{ background:rgba(255,255,255,0.08); color:var(--sidebar-text); }
+  .sidebar-foot a.active{ background:rgba(255,255,255,0.16); color:var(--sidebar-text); }
+  .sidebar-backdrop{ display:none; }
+  .main-col{ flex:1; min-width:0; display:flex; flex-direction:column; }
+  .topbar2{ display:flex; align-items:center; gap:12px; }
+  .topbar2 .brand{ display:flex; align-items:center; gap:8px; }
+  .mobile-menu-btn{ display:none; background:none; border:1px solid rgba(255,255,255,0.35); color:#fff; border-radius:6px; width:32px; height:32px; cursor:pointer; font-size:14px; flex:none; }
+  .topbar-logo-sm{ height:30px; width:auto; display:block; filter:drop-shadow(0 1px 2px rgba(0,0,0,0.25)); }
+  .user-chip-sm{ display:flex; align-items:center; gap:6px; font-size:11.5px; color:#fff; background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.25); border-radius:20px; padding:5px 12px; white-space:nowrap; }
+  .user-chip-sm .role-chip{ background:rgba(255,255,255,0.18); border:none; color:#fff; }
+  @media (max-width: 960px){
+    .sidebar{ position:fixed; top:0; bottom:0; left:0; transform:translateX(-102%); width:230px; box-shadow:0 0 30px rgba(0,0,0,0.3); }
+    [dir="rtl"] .sidebar{ left:auto; right:0; transform:translateX(102%); }
+    .sidebar.mobile-open{ transform:translateX(0); }
+    .mobile-menu-btn{ display:inline-block; }
+    .sidebar-backdrop.show{ display:block; position:fixed; inset:0; background:rgba(10,14,26,0.45); z-index:39; }
+    .topbar2{ flex-wrap:wrap; }
+    .user-chip-sm{ display:none; }
+  }
+
+  #mobileMenuBtn{ display:inline-flex !important; align-items:center; justify-content:center; }
+</style>
+</head>
+<body>
+
+<!-- ================= AUTH: FIRST-RUN SETUP ================= -->
+<div class="fullscreen-overlay auth-screen" id="authSetupScreen" style="display:none;">
+  <div class="auth-card">
+    <img src="logo-punjab-govt-print.png" alt="Government of the Punjab" style="height:44px;width:auto;display:block;margin:0 auto 10px;">
+    <h2 data-i18n="auth_createAccount">Create your account</h2>
+    <div class="auth-sub" data-i18n="auth_newAccountsNote">New accounts start as "Pending" (view-only). An existing Administrator must approve you afterwards before you can upload photos.</div>
+    <div class="field"><label data-i18n="lbl_name">Full name</label><input type="text" id="setup_name" placeholder="e.g. Iftikhar Ahmed"></div>
+    <div class="field"><label data-i18n="lbl_designation">Designation</label><input type="text" id="setup_designation" placeholder="e.g. Junior Clerk, Camp Office Prosecutor General Punjab"></div>
+    <div class="field"><label data-i18n="lbl_mobile">Mobile number (optional)</label><input type="tel" id="setup_mobile" placeholder="e.g. 0300-1234567"></div>
+    <div class="field"><label data-i18n="lbl_cnic">CNIC number</label><input type="text" id="setup_cnic" placeholder="e.g. 12345-1234567-1"></div>
+    <div class="field">
+      <label data-i18n="lbl_profilePic">Profile picture (optional)</label>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <div id="setupPhotoPreviewWrap" style="display:none;position:relative;">
+          <img id="setupPhotoPreview" alt="profile" style="width:48px;height:48px;border-radius:50%;object-fit:cover;border:1px solid #ccc;display:block;">
+          <button type="button" id="setupPhotoRemoveBtn" title="Remove" style="position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;border:none;background:#c0392b;color:#fff;font-size:10px;line-height:1;cursor:pointer;padding:0;">✕</button>
+        </div>
+        <input type="file" id="setupPhotoFile" accept="image/*">
+      </div>
+      <div id="setupPhotoProgress" style="font-size:11px;color:#1F4E78;margin-top:4px;display:none;"></div>
+    </div>
+    <div class="field"><label data-i18n="auth_yourEmail">Your email</label><input type="email" id="setup_username" placeholder="e.g. name@example.com"></div>
+    <div class="field"><label data-i18n="auth_password">Password</label><input type="password" id="setup_password"></div>
+    <div class="field"><label data-i18n="auth_confirmPassword">Confirm password</label><input type="password" id="setup_password2"></div>
+    <button class="btn" id="setupBtn" style="width:100%;" data-i18n="auth_createAccountBtn">Create account</button>
+    <div class="auth-error" id="setupError"></div>
+    <button class="btn ghost" id="backToLoginBtn" style="width:100%;margin-top:10px;" data-i18n="auth_backToSignin">Back to sign in</button>
+    <div class="auth-warn" data-i18n="auth_warnText">Photos and profile data are stored online in this system's shared Firebase database, visible only to signed-in staff.</div>
+  </div>
+</div>
+
+<!-- ================= AUTH: LOGIN ================= -->
+<div class="fullscreen-overlay auth-screen" id="authLoginScreen" style="display:none;">
+  <div class="auth-card">
+    <img src="logo-punjab-govt-print.png" alt="Government of the Punjab" style="height:44px;width:auto;display:block;margin:0 auto 10px;">
+    <h2 data-i18n="auth_signin">Sign in</h2>
+    <div class="auth-sub" data-i18n="app_subtitle">Camp Office Gallery &amp; Staff Directory</div>
+    <div class="field"><label data-i18n="auth_email">Email</label><input type="email" id="login_username"></div>
+    <div class="field"><label data-i18n="auth_password">Password</label><input type="password" id="login_password"></div>
+    <button class="btn" id="loginBtn" style="width:100%;" data-i18n="auth_signin">Sign in</button>
+    <div class="auth-error" id="loginError"></div>
+    <button class="btn ghost" id="goToSignupBtn" style="width:100%;margin-top:10px;" data-i18n="auth_createNewAccount">Create a new account</button>
+    <div style="text-align:center;margin-top:10px;"><a href="#" id="forgotPasswordLink" style="font-size:12.5px;color:#1F4E78;text-decoration:underline;" data-i18n="auth_forgotPassword">Forgot password?</a></div>
+  </div>
+</div>
+
+<!-- ================= MAIN APP ================= -->
+<div id="appMain" style="display:none;">
+    <div class="app-shell">
+    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-head">
+        <div class="sidebar-brand"><img src="logo-punjab-govt.png" alt="" style="height:24px;width:auto;"> <span>Camp Office</span></div>
+        <button class="sidebar-collapse-btn" id="sidebarCollapseBtn" title="Collapse">◧</button>
+      </div>
+      <nav class="sidebar-nav">
+        <a class="nav-item" href="https://cmpofficepgp.org/camp-office-suite/"><span class="ico">🏠</span><span class="label">Dashboard</span></a>
+        <div class="nav-group" id="navGroupCase">
+          <button class="nav-group-head" data-group="navGroupCase"><span class="ico">📁</span><span class="label">Case Management</span><span class="chev">›</span></button>
+          <div class="nav-submenu">
+            <a class="nav-subitem" href="https://cmpofficepgp.org/camp-office-suite/case-entry.html"><span class="ico">📋</span><span>Daily Case Entry</span></a>
+            <a class="nav-subitem" href="https://cmpofficepgp.org/case-notice-system/"><span class="ico">📨</span><span>Case Notices</span></a>
+            <a class="nav-subitem" href="https://cmpofficepgp.org/daily-case-management-system/"><span class="ico">🗃️</span><span>Daily Case Mgmt</span></a>
+            <a class="nav-subitem" href="https://cmpofficepgp.org/record-section-system/"><span class="ico">📚</span><span>Record Section</span></a>
+          </div>
+        </div>
+        <a class="nav-item" href="https://cmpofficepgp.org/bill-register-system/"><span class="ico">🧾</span><span class="label">Bill Register</span></a>
+        <a class="nav-item" href="https://cmpofficepgp.org/weekly-court-roster/"><span class="ico">🗂️</span><span class="label">Weekly Court Roster</span></a>
+        <a class="nav-item active" href="index.html"><span class="ico">🖼️</span><span class="label">Gallery</span></a>
+        <a class="nav-item" href="https://cmpofficepgp.org/camp-office-suite/employee-directory.html"><span class="ico">🗂️</span><span class="label">Employee Directory</span></a>
+      </nav>
+      <div class="sidebar-foot">
+        <a href="https://cmpofficepgp.org/camp-office-suite/chat-system.html"><span class="ico">💬</span><span class="label">Team Chat</span></a>
+        <a href="https://cmpofficepgp.org/camp-office-suite/ai-assistant.html"><span class="ico">🤖</span><span class="label">AI Assistant</span></a>
+        <a href="https://cmpofficepgp.org/camp-office-suite/backup-center.html"><span class="ico">💾</span><span class="label">Backup Center</span></a>
+        <a href="https://cmpofficepgp.org/camp-office-suite/"><span class="ico">←</span><span class="label">Portal</span></a>
+      </div>
+    </aside>
+    <div class="main-col">
+<div class="topbar">
+    <button class="mobile-menu-btn" id="mobileMenuBtn">☰</button>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <img src="logo-punjab-govt-print.png" alt="Government of the Punjab" style="height:38px;width:auto;flex:none;">
+      <div>
+        <h1 data-i18n="app_title">Camp Office Gallery</h1>
+        <div class="sub" data-i18n="app_subtitle2">Camp Office Prosecutor General Punjab, Supreme Court of Pakistan, Islamabad</div>
+      </div>
+    </div>
+    <div class="userbar">
+      <select id="uiLangSelect"><option value="en">English</option><option value="ur">اردو</option></select>
+      <select id="themeSwitcher" title="Theme — یہ آپ کے لاگ اِن کے ساتھ محفوظ ہو کر ہر سسٹم میں لاگو ہوگا">
+        <option value="navy">عدالتی نیلا / Navy</option>
+        <option value="green">سرکاری سبز / Green</option>
+        <option value="ivory">کاغذی سفید / Ivory</option>
+        <option value="teal">جدید ٹیل / Teal</option>
+      </select>
+      <span id="whoAmI"></span>
+      <span class="role-chip" id="roleChip"></span>
+      <button class="btn ghost small" id="btnHelp" data-i18n="nav_help" style="color:#fff;border-color:rgba(255,255,255,.5);">Help / Guide</button>
+      <a href="../" class="btn ghost small" title="Home / پورٹل پر واپس جائیں" style="text-decoration:none;color:#fff;border-color:rgba(255,255,255,.5);">🏠 Home</a>
+      <a href="../#ads" class="btn ghost small" title="اشتہارات دیکھیں / View Advertisements" style="text-decoration:none;color:#fff;border-color:rgba(255,255,255,.5);">📢 اشتہارات / Ads</a>
+      <button class="btn ghost small" id="signOutBtn" data-i18n="btn_signout" style="color:#fff;border-color:rgba(255,255,255,.5);">Sign out</button>
+      <img class="topbar-logo-sm" src="logo-public-prosecution.png" alt="Public Prosecution Punjab" style="height:26px;width:auto;">
+    </div>
+  </div>
+
+  <main>
+    <div class="guest-banner" id="pendingBanner" data-i18n="guest_pendingNote">Your account is pending approval by an Administrator. You can view the gallery, but cannot upload photos yet.</div>
+
+    <div class="toolbar">
+      <button class="btn" id="uploadOpenBtn" data-i18n="btn_uploadPhoto">Upload photo</button>
+      <button class="btn ghost" id="adminPanelBtn" style="display:none;" data-i18n="btn_manageUsers">Manage users</button>
+      <span class="count-chip" id="photoCountChip"></span>
+    </div>
+
+    <div class="gallery-grid" id="galleryGrid"></div>
+    <div class="empty-state" id="emptyState" style="display:none;" data-i18n="gallery_empty">No photos yet — be the first to upload one.</div>
+  </main>
+
+  <footer class="appfoot" data-i18n="app_footer">Camp Office Gallery — every photo records who uploaded it and when.</footer>
+<div class="appfoot-copyright" style="text-align:center;font-size:11px;color:#8aa0b3;padding:6px 10px 14px;">© Iftikhar Ahmed — Camp Office, Prosecutor General Punjab, Supreme Court of Pakistan, Islamabad &nbsp;|&nbsp; © افتخار احمد — کیمپ آفس، پراسیکیوٹر جنرل پنجاب، سپریم کورٹ آف پاکستان، اسلام آباد</div>
+
+  <button id="chatToggleBtn" title="Team Chat">💬<span class="chat-badge" id="chatBadge" style="display:none;">0</span></button>
+  <div id="chatPanel">
+    <div class="chat-head">
+      <div>
+        <h3 data-i18n="chat_title">Team Chat</h3>
+        <div class="chat-online" id="chatOnlineLabel">0 online</div>
+      </div>
+      <button id="chatCloseBtn">✕</button>
+    </div>
+    <div class="chat-messages" id="chatMessages"></div>
+    <div class="chat-mic-status" id="chatMicStatus" style="display:none;padding:6px 10px;border-top:1px solid var(--border);background:#fff5f5;font-size:12px;color:#b00020;align-items:center;gap:8px;">
+      <span>🔴</span><span id="chatMicTimer">0:00</span>
+      <span data-i18n="chat_recording" style="flex:1;">Recording — click 🎤 again to send, or ✕ to cancel</span>
+      <button type="button" id="chatMicCancelBtn" title="Cancel" style="border:none;background:#eee;color:#333;border-radius:6px;padding:2px 8px;cursor:pointer;">✕</button>
+    </div>
+    <div class="chat-upload-progress" id="chatUploadProgress" style="display:none;"></div>
+    <div class="chat-input-bar">
+      <div class="chat-toolbar-row">
+        <input type="file" id="chatFileInput" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" style="display:none;">
+        <button type="button" id="chatAttachBtn" class="chat-icon-btn" title="Attach file">📎</button>
+        <button type="button" id="chatEmojiBtn" class="chat-icon-btn" title="Emoji">😊</button>
+        <button type="button" id="chatMicBtn" class="chat-icon-btn" title="Record a voice message / صوتی پیغام ریکارڈ کریں">🎤</button>
+        <div class="chat-emoji-picker" id="chatEmojiPicker"></div>
+      </div>
+      <div class="chat-main-row">
+        <textarea id="chatInput" data-i18n-placeholder="chat_typeMessage" placeholder="Type a message…"></textarea>
+        <button id="chatSendBtn" data-i18n="chat_send">Send</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= HELP / GUIDE OVERLAY ================= -->
+<div class="fullscreen-overlay" id="helpOverlay" style="display:none;">
+  <div class="help-shell">
+    <div class="help-toolbar">
+      <h2 data-i18n="help_title">Help &amp; User Guide</h2>
+      <button class="btn ghost" id="helpCloseBtn" data-i18n="btn_close">Close</button>
+    </div>
+    <div class="help-body">
+      <p class="help-intro" data-i18n="help_introText">This is one shared photo gallery and staff directory for the whole office. A new account starts as "Guest" (pending) and can only view the gallery; once an Administrator approves it as "Staff", that person can upload and delete their own photos. An Administrator can do everything, including approving accounts and managing everyone's role from "Manage users".</p>
+
+      <div class="card">
+        <h3 data-i18n="help_signup_title">Signing up &amp; getting approved</h3>
+        <p class="help-intro" data-i18n="help_signup_intro">Everyone creates their own account the first time — there's no separate "add a person" step.</p>
+        <ol class="help-steps">
+          <li data-i18n="help_signup_s1">On the sign-in screen, press "Create a new account" and fill in your name, designation, mobile number, CNIC, email, and a password.</li>
+          <li data-i18n="help_signup_s2">Your account starts as "Guest (pending)" — you can sign in and view the gallery immediately, but the "Upload photo" button stays disabled until an Administrator approves you.</li>
+          <li data-i18n="help_signup_s3">Ask an Administrator to open "Manage users" and change your role to "Staff" — after that, uploading and deleting your own photos works right away.</li>
+        </ol>
+      </div>
+
+      <div class="card">
+        <h3 data-i18n="help_upload_title">Uploading a photo</h3>
+        <p class="help-intro" data-i18n="help_upload_intro">Available once your account is approved as Staff or Administrator.</p>
+        <ol class="help-steps">
+          <li data-i18n="help_upload_s1">Press "Upload photo", choose an image file (under 8 MB), optionally add a caption, then press "Upload".</li>
+          <li data-i18n="help_upload_s2">Every photo automatically records who uploaded it and exactly when — this is shown under the photo and in its full view.</li>
+        </ol>
+      </div>
+
+      <div class="card">
+        <h3 data-i18n="help_view_title">Viewing &amp; deleting a photo</h3>
+        <p class="help-intro" data-i18n="help_view_intro">Click any photo in the grid to see it full-size with its caption and uploader details.</p>
+        <ol class="help-steps">
+          <li data-i18n="help_view_s1">Hover over a photo to reveal a small ✕ button in its corner — this appears only on photos you're allowed to delete.</li>
+          <li data-i18n="help_view_s2">Staff can delete their own uploads; an Administrator can delete any photo in the gallery.</li>
+        </ol>
+      </div>
+
+      <div class="card">
+        <h3 data-i18n="help_admin_title">Manage users (Administrator)</h3>
+        <p class="help-intro" data-i18n="help_admin_intro">This controls who can sign in, upload, and manage the gallery.</p>
+        <ol class="help-steps">
+          <li data-i18n="help_admin_s1">Open "Manage users" to see every staff member who has signed up, with their name, designation, mobile, CNIC, and email.</li>
+          <li data-i18n="help_admin_s2">Change the dropdown next to a name to approve a pending Guest as Staff, promote someone to Administrator, or move someone back to Guest.</li>
+          <li data-i18n="help_admin_s3">"Remove access" deletes their profile from this system (their sign-in account itself needs a separate step in the Firebase Console if it must be removed too).</li>
+        </ol>
+      </div>
+
+      <div class="card">
+        <h3 data-i18n="help_faqTitle">Frequently Asked Questions</h3>
+        <details class="faq-item">
+          <summary data-i18n="help_faq1_q">I signed up but the "Upload photo" button is disabled — why?</summary>
+          <div class="faq-answer" data-i18n="help_faq1_a">New accounts start as "Guest (pending)" for safety. An Administrator needs to approve you as "Staff" from "Manage users" before you can upload.</div>
+        </details>
+        <details class="faq-item">
+          <summary data-i18n="help_faq2_q">What's the difference between Guest, Staff, and Administrator?</summary>
+          <div class="faq-answer" data-i18n="help_faq2_a">Guest (pending) can only view the gallery. Staff can also upload photos and delete their own. Administrator can do everything, including approving accounts, changing anyone's role, and deleting any photo.</div>
+        </details>
+        <details class="faq-item">
+          <summary data-i18n="help_faq3_q">Can I delete someone else's photo?</summary>
+          <div class="faq-answer" data-i18n="help_faq3_a">Only an Administrator can delete a photo uploaded by someone else. Staff can only delete their own uploads.</div>
+        </details>
+        <details class="faq-item">
+          <summary data-i18n="help_faq4_q">How do I switch between English and Urdu?</summary>
+          <div class="faq-answer" data-i18n="help_faq4_a">Use the language selector at the top of the screen. It changes menus, labels, and buttons instantly for everyone's own screen.</div>
+        </details>
+        <details class="faq-item">
+          <summary data-i18n="help_faq5_q">Where are the photos stored — is my data safe if this computer breaks?</summary>
+          <div class="faq-answer" data-i18n="help_faq5_a">Photos and profile data are stored online in this system's shared Firebase project (Storage for the image files, Firestore for the details), not on any one computer. If this computer is lost, nothing is lost — just sign in again from any other computer.</div>
+        </details>
+        <details class="faq-item">
+          <summary data-i18n="help_faq6_q">Can more than one person use the gallery at the same time?</summary>
+          <div class="faq-answer" data-i18n="help_faq6_a">Yes. Everyone signed in sees the same live gallery, and a photo uploaded by one person appears for everyone else within a moment.</div>
+        </details>
+        <details class="faq-item">
+          <summary data-i18n="help_faq7_q">Is there a limit on photo size?</summary>
+          <div class="faq-answer" data-i18n="help_faq7_a">Yes, each photo must be under 8 MB. If your photo is larger, resize or compress it before uploading.</div>
+        </details>
+        <details class="faq-item">
+          <summary data-i18n="help_faq8_q">I made a mistake in my name or designation when signing up — can I fix it?</summary>
+          <div class="faq-answer" data-i18n="help_faq8_a">Not from your own screen yet — ask an Administrator, who can correct it directly from the Firebase Console's "users" collection.</div>
+        </details>
+        <details class="faq-item">
+          <summary data-i18n="help_faq9_q">How do I add a caption to a photo after uploading it?</summary>
+          <div class="faq-answer" data-i18n="help_faq9_a">Captions are set at upload time in this version. If you need to change one, delete the photo and re-upload it with the correct caption.</div>
+        </details>
+        <details class="faq-item">
+          <summary data-i18n="help_faq10_q">What does the small chat button in the corner do?</summary>
+          <div class="faq-answer" data-i18n="help_faq10_a">It opens Team Chat, where everyone currently signed in can message each other — handy for quick coordination while browsing the gallery.</div>
+        </details>
+        <details class="faq-item">
+          <summary data-i18n="help_faq11_q">I forgot my password — what should I do?</summary>
+          <div class="faq-answer" data-i18n="help_faq11_a">Click "Forgot password?" on the sign-in screen, enter your email, and a password reset link will be sent to your inbox (check spam too) — no need to contact an Administrator.</div>
+        </details>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= UPLOAD MODAL ================= -->
+<div class="modal-overlay" id="uploadModal">
+  <div class="modal">
+    <h3 data-i18n="upload_title">Upload a photo</h3>
+    <div class="field"><label data-i18n="upload_pickFile">Choose image</label><input type="file" id="uploadFileInput" accept="image/*"></div>
+    <div class="field"><label data-i18n="upload_caption">Caption (optional)</label><input type="text" id="uploadCaption" placeholder="e.g. Office annual function, 2026"></div>
+    <div class="field-hint" id="uploadProgressHint"></div>
+    <div class="actions">
+      <button class="btn ghost" id="uploadCancelBtn" data-i18n="btn_cancel">Cancel</button>
+      <button class="btn" id="uploadConfirmBtn" data-i18n="btn_upload">Upload</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= VIEWER MODAL ================= -->
+<div class="modal-overlay" id="viewerModal">
+  <div class="modal wide">
+    <img class="viewer-img" id="viewerImg" src="" alt="">
+    <div class="viewer-meta" id="viewerMeta"></div>
+    <div class="actions">
+      <button class="btn ghost" id="viewerCloseBtn" data-i18n="btn_close">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= ADMIN: MANAGE USERS MODAL ================= -->
+<div class="modal-overlay" id="adminModal">
+  <div class="modal wide">
+    <h3 data-i18n="admin_manageUsersTitle">Manage staff accounts</h3>
+    <div class="field-hint" data-i18n="admin_manageUsersHint" style="margin-bottom:12px;">Approve pending accounts, or change a staff member's role. "Guest" = view only, "Staff" = can upload/delete own photos, "Administrator" = full control.</div>
+    <div style="overflow-x:auto;overflow-y:auto;max-height:50vh;max-width:100%;">
+      <table>
+        <thead><tr>
+          <th></th><th data-i18n="th_name">Name</th><th data-i18n="th_designation">Designation</th>
+          <th data-i18n="th_mobile">Mobile</th><th data-i18n="th_cnic">CNIC</th>
+          <th data-i18n="th_email">Email</th><th data-i18n="th_role">Role</th><th></th>
+        </tr></thead>
+        <tbody id="adminUsersBody"></tbody>
+      </table>
+    </div>
+    <div class="actions">
+      <button class="btn ghost" id="adminCloseBtn" data-i18n="btn_close">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* =====================================================================
+   FIREBASE CONFIG — replace with your own project's config values
+   (Firebase Console -> Project settings -> General -> Your apps -> SDK
+   setup and configuration). This project needs Authentication (Email/
+   Password), Firestore Database, and Storage all enabled.
+   ===================================================================== */
+var firebaseConfig = {
+  apiKey: "AIzaSyCWl8dktUjAGF_JLMuZun2w3g_xnX3WBkU",
+  authDomain: "camp-office-project.firebaseapp.com",
+  projectId: "camp-office-project",
+  storageBucket: "camp-office-project.firebasestorage.app",
+  messagingSenderId: "246340921152",
+  appId: "1:246340921152:web:84b0a687a00a95523f23ca5"
+};
+firebase.initializeApp(firebaseConfig);
+var auth = firebase.auth();
+var db = firebase.firestore();
+
+/* ===== Super Admin Email OTP Gate =====
+   Extra check specifically for the super_admin role: after the normal
+   Firebase sign-in (even one from a saved/autofilled password), a
+   super_admin must also enter a one-time code that this page emails to
+   their own registered address -- the same idea as a "forgot password"
+   email, used here as a second login factor. Sent via EmailJS
+   (https://www.emailjs.com) since this static site has no server of its
+   own. The code itself is never stored -- only its SHA-256 hash (salted
+   with the uid) is written to Firestore, and it expires in 10 minutes. */
+var SPIN_EMAILJS_SERVICE_ID  = "service_mw99li8";
+var SPIN_EMAILJS_TEMPLATE_ID = "template_8bijngj";
+var SPIN_EMAILJS_PUBLIC_KEY  = "HplyUka2cF879lLkA";
+var SPIN_OTP_TTL_MS = 10*60*1000;
+var SPIN_RESEND_COOLDOWN_MS = 60*1000;
+function spinHash(uid, code){
+  var bytes = new TextEncoder().encode("campoffice-otp-v1:" + uid + ":" + code);
+  return crypto.subtle.digest("SHA-256", bytes).then(function(buf){
+    return Array.prototype.map.call(new Uint8Array(buf), function(b){ return b.toString(16).padStart(2,"0"); }).join("");
+  });
+}
+function spinVerifiedKey(uid){ return "spinVerified_" + uid; }
+/* Verification persists in localStorage (shared across every tab/system on this origin,
+   and across browser restarts) instead of sessionStorage (which was scoped to a single
+   tab and made every other open system/tab ask for a fresh OTP even right after a
+   successful one). It is cleared explicitly on sign-out below, so signing out and back
+   in still asks for a fresh code. (3 Oct 2026, per user request) Verification ALSO now
+   expires on its own after SPIN_VERIFIED_TTL_MS (4 hours), even while staying signed in
+   -- previously it lasted forever until sign-out, however many days that took. Now a
+   super_admin is asked for one fresh email code every 4 hours, not just once per
+   "stay signed in" session. */
+var SPIN_VERIFIED_TTL_MS = 4*60*60*1000;
+function spinIsVerified(uid){
+  try{
+    var raw = localStorage.getItem(spinVerifiedKey(uid));
+    if(!raw) return false;
+    var ts = parseInt(raw, 10);
+    if(!ts || isNaN(ts)) return false;
+    return (Date.now() - ts) < SPIN_VERIFIED_TTL_MS;
+  }catch(e){ return false; }
+}
+function spinMarkVerified(uid){ try{ localStorage.setItem(spinVerifiedKey(uid), String(Date.now())); }catch(e){} }
+function spinClearVerified(uid){ try{ if(uid) localStorage.removeItem(spinVerifiedKey(uid)); }catch(e){} }
+function spinGenerateCode(){ return String(Math.floor(100000 + Math.random()*900000)); }
+function spinSendCode(uid, email){
+  var code = spinGenerateCode();
+  return spinHash(uid, code).then(function(hash){
+    return db.collection("users").doc(uid).update({ otpHash: hash, otpExpiresAt: Date.now() + SPIN_OTP_TTL_MS });
+  }).then(function(){
+    return emailjs.send(SPIN_EMAILJS_SERVICE_ID, SPIN_EMAILJS_TEMPLATE_ID, { to_email: email, passcode: code, time: "10" }, SPIN_EMAILJS_PUBLIC_KEY);
+  });
+}
+var SPIN_GATE_OPEN_FOR = null;
+function spinGate(uid, data, proceedFn){
+  if(!data || data.roleV2 !== "super_admin"){ proceedFn(); return; }
+  if(spinIsVerified(uid)){ proceedFn(); return; }
+  if(SPIN_GATE_OPEN_FOR === uid){ return; } /* already open for this uid -- ignore re-entrant snapshot fires */
+  var ov = document.getElementById("spinGateOverlay");
+  if(!ov || typeof emailjs === "undefined"){ proceedFn(); return; } /* gate/EmailJS missing -- fail open rather than lock the app */
+  SPIN_GATE_OPEN_FOR = uid;
+  var input1 = document.getElementById("spinGateInput1");
+  var err = document.getElementById("spinGateError");
+  var btn = document.getElementById("spinGateBtn");
+  var resendBtn = document.getElementById("spinGateResend");
+  var signOutLink = document.getElementById("spinGateSignOut");
+  var email = data.email || "";
+  var masked = email.replace(/^(.{2}).+(@.+)$/, "$1***$2");
+  err.textContent = ""; input1.value = "";
+  document.getElementById("spinGateTitle").textContent = "سیکورٹی کوڈ درج کریں";
+  document.getElementById("spinGateSub").textContent = "ایک 6 ہندسوں کا کوڈ آپ کی ای میل (" + (masked || email) + ") پر بھیجا جا رہا ہے۔ وہ کوڈ یہاں درج کریں۔";
+  ov.style.display = "flex";
+  var cooldownTimer = null;
+  function startResendCooldown(){
+    var resendAt = Date.now() + SPIN_RESEND_COOLDOWN_MS;
+    resendBtn.disabled = true;
+    if(cooldownTimer) clearInterval(cooldownTimer);
+    cooldownTimer = setInterval(function(){
+      var left = Math.ceil((resendAt - Date.now())/1000);
+      if(left <= 0){ resendBtn.textContent = "کوڈ دوبارہ بھیجیں"; resendBtn.disabled = false; clearInterval(cooldownTimer); }
+      else{ resendBtn.textContent = "دوبارہ بھیجیں (" + left + ")"; }
+    }, 500);
+  }
+  function sendNow(){
+    btn.disabled = true; err.textContent = "";
+    spinSendCode(uid, email).then(function(){
+      btn.disabled = false;
+      startResendCooldown();
+    }).catch(function(e){
+      btn.disabled = false;
+      err.textContent = "کوڈ بھیجنے میں خرابی: " + (e && e.message ? e.message : e);
+    });
+  }
+  sendNow();
+  input1.focus();
+  function finish(){ SPIN_GATE_OPEN_FOR = null; if(cooldownTimer) clearInterval(cooldownTimer); spinMarkVerified(uid); ov.style.display = "none"; proceedFn(); }
+  function submit(){
+    var code = input1.value.trim();
+    err.textContent = "";
+    if(!/^[0-9]{6}$/.test(code)){ err.textContent = "کوڈ 6 ہندسوں پر مشتمل ہونا چاہیے۔"; return; }
+    btn.disabled = true;
+    db.collection("users").doc(uid).get().then(function(snap){
+      var d = snap.exists ? snap.data() : {};
+      if(!d.otpHash || !d.otpExpiresAt || Date.now() > d.otpExpiresAt){ return "EXPIRED"; }
+      return spinHash(uid, code).then(function(hash){ return hash === d.otpHash ? "OK" : "WRONG"; });
+    }).then(function(result){
+      btn.disabled = false;
+      if(result === "OK"){ finish(); }
+      else if(result === "EXPIRED"){ err.textContent = "کوڈ کی مدت ختم ہو گئی — نیا کوڈ منگوائیں۔"; }
+      else{ err.textContent = "غلط کوڈ، دوبارہ کوشش کریں۔"; input1.value = ""; input1.focus(); }
+    }).catch(function(e){ btn.disabled = false; err.textContent = "تصدیق میں خرابی: " + e.message; });
+  }
+  btn.onclick = submit;
+  input1.onkeydown = function(ev){ if(ev.key === "Enter") submit(); };
+  resendBtn.onclick = function(ev){ ev.preventDefault(); sendNow(); };
+  signOutLink.onclick = function(ev){ ev.preventDefault(); SPIN_GATE_OPEN_FOR = null; if(cooldownTimer) clearInterval(cooldownTimer); ov.style.display = "none"; auth.signOut(); };
+}
+
+/* ===== Photo storage: Cloudinary (not Firebase Storage) =====
+   Firebase's Cloud Storage needs the paid "Blaze" billing plan, which hit a
+   billing error on this account (OR_BACR2_44). Cloudinary's free plan needs
+   no card at all (25 GB storage/bandwidth per month, more than enough for an
+   office photo gallery) and accepts direct "unsigned" uploads straight from
+   this page's own JavaScript — no server needed. Only the cloud name and an
+   UNSIGNED upload preset are used here; the account's API Secret must never
+   appear in this file (or any client-side code) — it isn't needed for this
+   upload method, and this app never asks for it. */
+var CLOUDINARY_CLOUD_NAME = "rjsudteo";
+var CLOUDINARY_UPLOAD_PRESET = "t8euf8jm";
+
+/* ================= THEME (per-user; follows the user's login across every camp-office system) ================= */
+var THEME_NAMES = ["navy","green","ivory","teal"];
+function applyTheme(name){
+  if(THEME_NAMES.indexOf(name)===-1) name = "navy";
+  document.documentElement.setAttribute("data-theme", name);
+  try{ localStorage.setItem("campOfficeTheme", name); }catch(e){}
+  var sel = document.getElementById("themeSwitcher");
+  if(sel && sel.value!==name) sel.value = name;
+}
+document.getElementById("themeSwitcher").addEventListener("change", function(){
+  var name = this.value;
+  applyTheme(name);
+  if(CURRENT_USER){
+    db.collection("users").doc(CURRENT_USER.uid).set({theme:name}, {merge:true}).catch(function(err){ toast("Theme could not be saved: "+err.message); });
+  }
+});
+
+var CURRENT_USER = null; // {uid,email,name,designation,role,galleryStatus,photoURL}
+                          // role = global SSO role ("admin"|"guest", shared with the other 3 systems)
+                          // galleryStatus = effective Gallery permission tier ("admin"|"pending"),
+                          //   derived below entirely from the shared roleV2 field: ONLY super_admin -> "admin"
+                          //   (full upload/manage control); every other role (admin, data_entry, viewer) -> "pending"
+                          //   (view-only). There is no independent Gallery-only role anymore, and no "staff" tier --
+                          //   uploading/managing photos here is the Super Admin's job alone.
+var galleryUnsub = null;
+var GALLERY_ITEMS = [];
+
+function toast(msg){
+  var el = document.getElementById("toast");
+  el.textContent = msg;
+  el.classList.add("show");
+  clearTimeout(el._t);
+  el._t = setTimeout(function(){ el.classList.remove("show"); }, 3200);
+}
+function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g, function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c];}); }
+function fmtDate(ts){
+  if(!ts) return "";
+  var d = ts.toDate? ts.toDate() : new Date(ts);
+  if(isNaN(d.getTime())) return ""; /* never show the literal text "Invalid Date" -- a
+     serverTimestamp() that hasn't resolved locally yet, or any other unparseable value,
+     just shows blank for a moment instead */
+  return d.toLocaleDateString(undefined,{year:"numeric",month:"short",day:"numeric"}) + " " +
+         d.toLocaleTimeString(undefined,{hour:"2-digit",minute:"2-digit"});
+}
+
+/* ---------------- i18n ---------------- */
+var UI_LANG_STORAGE_KEY = "campgallery_ui_lang";
+var I18N_UI = {
+  en: {
+    auth_createAccount:"Create your account",
+    auth_newAccountsNote:"New accounts can sign in and view the gallery right away. Uploading and managing photos here is limited to the Super Admin only.",
+    lbl_name:"Full name", lbl_designation:"Designation",
+    auth_yourEmail:"Your email", auth_password:"Password", auth_confirmPassword:"Confirm password",
+    auth_createAccountBtn:"Create account", auth_backToSignin:"Back to sign in",
+    auth_warnText:"Photos and profile data are stored online in this system's shared Firebase database, visible only to signed-in staff.",
+    auth_signin:"Sign in", auth_signingIn:"Signing in…", app_subtitle:"Camp Office Gallery & Staff Directory",
+    auth_email:"Email", auth_createNewAccount:"Create a new account", auth_forgotPassword:"Forgot password?",
+    app_title:"Camp Office Gallery",
+    app_subtitle2:"Camp Office Prosecutor General Punjab, Supreme Court of Pakistan, Islamabad",
+    btn_signout:"Sign out",
+    guest_pendingNote:"You can view the gallery here. Uploading and managing photos is limited to the Super Admin account only.",
+    btn_uploadPhoto:"Upload photo", btn_manageUsers:"Manage users",
+    gallery_empty:"No photos yet — be the first to upload one.",
+    app_footer:"Camp Office Gallery — every photo records who uploaded it and when.",
+    upload_title:"Upload a photo", upload_pickFile:"Choose image", upload_caption:"Caption (optional)",
+    btn_cancel:"Cancel", btn_upload:"Upload", btn_close:"Close",
+    admin_manageUsersTitle:"Manage staff accounts",
+    admin_manageUsersHint:"The role shown here always matches the Suite's Admin Controls panel exactly. Only the Super Admin can upload or manage photos in this gallery — everyone else (Viewer, Data Entry, and even a regular Admin) is view-only here. To change someone's role, open \"Change in Suite\" next to their name.",
+    admin_changeInSuite:"Change in Suite →",
+    lbl_mobile:"Mobile number", lbl_cnic:"CNIC number", lbl_profilePic:"Profile picture (optional)",
+    th_name:"Name", th_designation:"Designation", th_mobile:"Mobile", th_cnic:"CNIC", th_email:"Email", th_role:"Role",
+    role_guest:"Guest (pending)", role_user:"Staff", role_admin:"Administrator", role_superAdmin:"Super Admin",
+    gr_role_viewer:"Viewer", gr_role_data_entry:"Data Entry", gr_role_admin:"Admin", gr_role_super_admin:"Super Admin",
+    btn_remove:"Remove access",
+
+    nav_help:"Help / Guide",
+    help_title:"Help & User Guide",
+    help_introText:"This is one shared photo gallery and staff directory for the whole office. Everyone with an account can sign in and view the gallery and staff directory. Uploading, deleting, and managing photos here is limited to the Super Admin only — the same Super Admin who manages everyone's role from the Suite's Admin Controls.",
+    help_signup_title:"Signing up",
+    help_signup_intro:"Everyone creates their own account the first time — there's no separate \"add a person\" step.",
+    help_signup_s1:"On the sign-in screen, press \"Create a new account\" and fill in your name, designation, mobile number, CNIC, email, and a password.",
+    help_signup_s2:"Your account can sign in and view the gallery right away. The \"Upload photo\" button stays hidden, because uploading here is limited to the Super Admin only — no other role can be approved into it.",
+    help_signup_s3:"If a photo needs to be added to the gallery, it has to be uploaded by the Super Admin account.",
+    help_upload_title:"Uploading a photo",
+    help_upload_intro:"Available only to the Super Admin.",
+    help_upload_s1:"Press \"Upload photo\", choose an image file (under 8 MB), optionally add a caption, then press \"Upload\".",
+    help_upload_s2:"Every photo automatically records who uploaded it and exactly when — this is shown under the photo and in its full view.",
+    help_view_title:"Viewing & deleting a photo",
+    help_view_intro:"Click any photo in the grid to see it full-size with its caption and uploader details.",
+    help_view_s1:"Hover over a photo to reveal a small ✕ button in its corner — this appears only for the Super Admin.",
+    help_view_s2:"Only the Super Admin can delete a photo, whether it's their own upload or anyone else's.",
+    help_admin_title:"Manage staff accounts (Super Admin only)",
+    help_admin_intro:"This is a read-only list of everyone's role — it does not grant gallery upload access to anyone, since only the Super Admin ever has that.",
+    help_admin_s1:"Open \"Manage users\" to see every staff member who has signed up, with their name, designation, mobile, CNIC, email, and role.",
+    help_admin_s2:"Use \"Change in Suite\" next to a name to open the Suite's Admin Controls, where roles are actually changed. Gallery upload/manage access always follows the Super Admin role — it isn't set separately here.",
+    help_admin_s3:"To remove someone's access entirely, do this from the Suite's Admin Controls — their account is shared across all camp-office systems, so it should not be removed from just one of them.",
+    help_faqTitle:"Frequently Asked Questions",
+    help_faq1_q:"I signed up but the \"Upload photo\" button is hidden — why?",
+    help_faq1_a:"Uploading in this gallery is limited to the Super Admin account only. No other role — including a regular Admin — can be given upload access here.",
+    help_faq2_q:"What's the difference between Viewer, Data Entry, Admin, and Super Admin here?",
+    help_faq2_a:"In this gallery specifically, only the Super Admin can upload, delete any photo, and manage accounts. Viewer, Data Entry, and a regular Admin can all view the gallery and staff directory, but none of them can upload or delete.",
+    help_faq3_q:"Can I delete someone else's photo?",
+    help_faq3_a:"Only the Super Admin can delete a photo, including one uploaded by someone else.",
+    help_faq4_q:"How do I switch between English and Urdu?",
+    help_faq4_a:"Use the language selector at the top of the screen. It changes menus, labels, and buttons instantly for everyone's own screen.",
+    help_faq5_q:"Where are the photos stored — is my data safe if this computer breaks?",
+    help_faq5_a:"Photos and profile data are stored online in this system's shared Firebase project (Storage for the image files, Firestore for the details), not on any one computer. If this computer is lost, nothing is lost — just sign in again from any other computer.",
+    help_faq6_q:"Can more than one person use the gallery at the same time?",
+    help_faq6_a:"Yes. Everyone signed in sees the same live gallery, and a photo uploaded by one person appears for everyone else within a moment.",
+    help_faq7_q:"Is there a limit on photo size?",
+    help_faq7_a:"Yes, each photo must be under 8 MB. If your photo is larger, resize or compress it before uploading.",
+    help_faq8_q:"I made a mistake in my name or designation when signing up — can I fix it?",
+    help_faq8_a:"Not from your own screen yet — ask an Administrator, who can correct it directly from the Firebase Console's \"users\" collection.",
+    help_faq9_q:"How do I add a caption to a photo after uploading it?",
+    help_faq9_a:"Captions are set at upload time in this version. If you need to change one, delete the photo and re-upload it with the correct caption.",
+    help_faq10_q:"What does the small chat button in the corner do?",
+    help_faq10_a:"It opens Team Chat, where everyone currently signed in can message each other — handy for quick coordination while browsing the gallery.",
+    help_faq11_q:"I forgot my password — what should I do?",
+    help_faq11_a:"Click \"Forgot password?\" on the sign-in screen, enter your email, and a password reset link will be sent to your inbox (check spam too) — no need to contact an Administrator.",
+
+    chat_title:"Team Chat", chat_typeMessage:"Type a message…", chat_send:"Send",
+    chat_onlineCount:"{n} online", chat_noMessages:"No messages yet — say hello!", chat_you:"You", chat_guest:"Guest",
+    chat_recording:"Recording — click 🎤 again to send, or ✕ to cancel",
+    chat_delete:"Delete", chat_attach:"Attach file", chat_emoji:"Emoji",
+    chat_fileTooBig:"File should be under 10MB.", chat_uploadFailed:"File upload failed.",
+    chat_uploading:"Uploading… {p}%"
+  },
+  ur: {
+    auth_createAccount:"اپنا اکاؤنٹ بنائیں",
+    auth_newAccountsNote:"نیا اکاؤنٹ فوراً سائن اِن ہو کر گیلری دیکھ سکتا ہے۔ یہاں تصویر اپ لوڈ اور انتظام صرف Super Admin کر سکتا ہے۔",
+    lbl_name:"پورا نام", lbl_designation:"عہدہ",
+    auth_yourEmail:"آپ کا ای میل", auth_password:"پاسورڈ", auth_confirmPassword:"پاسورڈ دوبارہ لکھیں",
+    auth_createAccountBtn:"اکاؤنٹ بنائیں", auth_backToSignin:"واپس سائن ان",
+    auth_warnText:"تصاویر اور پروفائل ڈیٹا اس سسٹم کے مشترکہ Firebase ڈیٹابیس میں آن لائن محفوظ ہوتا ہے، صرف سائن ان عملہ ہی دیکھ سکتا ہے۔",
+    auth_signin:"سائن ان", auth_signingIn:"سائن اِن ہو رہا ہے…", app_subtitle:"کیمپ آفس گیلری اور اسٹاف ڈائریکٹری",
+    auth_email:"ای میل", auth_createNewAccount:"نیا اکاؤنٹ بنائیں", auth_forgotPassword:"پاسورڈ بھول گئے؟",
+    app_title:"کیمپ آفس گیلری",
+    app_subtitle2:"کیمپ آفس پراسیکیوٹر جنرل پنجاب، سپریم کورٹ آف پاکستان، اسلام آباد",
+    btn_signout:"سائن آؤٹ",
+    guest_pendingNote:"آپ یہاں گیلری دیکھ سکتے ہیں۔ تصویر اپ لوڈ اور انتظام صرف Super Admin اکاؤنٹ کر سکتا ہے۔",
+    btn_uploadPhoto:"تصویر اپ لوڈ کریں", btn_manageUsers:"صارفین کا انتظام",
+    gallery_empty:"ابھی کوئی تصویر موجود نہیں — سب سے پہلے آپ اپ لوڈ کریں۔",
+    app_footer:"کیمپ آفس گیلری — ہر تصویر پر ریکارڈ رہتا ہے کہ کس نے اور کب اپ لوڈ کی۔",
+    upload_title:"تصویر اپ لوڈ کریں", upload_pickFile:"تصویر منتخب کریں", upload_caption:"کیپشن (اختیاری)",
+    btn_cancel:"منسوخ", btn_upload:"اپ لوڈ کریں", btn_close:"بند کریں",
+    admin_manageUsersTitle:"عملے کے اکاؤنٹس کا انتظام",
+    admin_manageUsersHint:'یہاں دکھایا گیا کردار ہمیشہ سوٹ کے Admin Controls پینل سے بالکل مماثل ہوتا ہے۔ اس گیلری میں تصویر اپ لوڈ یا انتظام صرف Super Admin کر سکتا ہے — باقی سب (Viewer، Data Entry، اور عام Admin بھی) صرف دیکھ سکتے ہیں۔ کسی کا کردار تبدیل کرنے کے لیے نام کے سامنے "سوٹ میں تبدیل کریں" کھولیں۔',
+    admin_changeInSuite:"سوٹ میں تبدیل کریں ←",
+    lbl_mobile:"موبائل نمبر", lbl_cnic:"شناختی کارڈ نمبر (CNIC)", lbl_profilePic:"پروفائل تصویر (اختیاری)",
+    th_name:"نام", th_designation:"عہدہ", th_mobile:"موبائل", th_cnic:"CNIC", th_email:"ای میل", th_role:"کردار",
+    role_guest:"Guest (زیر التوا)", role_user:"Staff", role_admin:"Administrator", role_superAdmin:"سپر ایڈمن",
+    gr_role_viewer:"ناظر", gr_role_data_entry:"ڈیٹا انٹری", gr_role_admin:"ایڈمن", gr_role_super_admin:"سپر ایڈمن",
+    btn_remove:"رسائی ختم کریں",
+
+    nav_help:"مدد / رہنمائی",
+    help_title:"مدد اور صارف رہنما",
+    help_introText:"یہ پورے دفتر کے لیے ایک مشترکہ تصویری گیلری اور اسٹاف ڈائریکٹری ہے۔ ہر اکاؤنٹ سائن اِن ہو کر گیلری اور اسٹاف ڈائریکٹری دیکھ سکتا ہے۔ تصویر اپ لوڈ کرنا، حذف کرنا، اور انتظام صرف Super Admin کر سکتا ہے — وہی Super Admin جو سوٹ کے Admin Controls سے سب کا کردار مقرر کرتا ہے۔",
+    help_signup_title:"سائن اپ کرنا",
+    help_signup_intro:"ہر شخص پہلی بار اپنا اکاؤنٹ خود بناتا ہے — یہاں الگ سے \"شخص شامل کریں\" کا کوئی مرحلہ نہیں۔",
+    help_signup_s1:"سائن اِن اسکرین پر \"نیا اکاؤنٹ بنائیں\" دبائیں اور اپنا نام، عہدہ، موبائل نمبر، CNIC، ای میل، اور پاسورڈ درج کریں۔",
+    help_signup_s2:"آپ کا اکاؤنٹ فوراً سائن اِن ہو کر گیلری دیکھ سکتا ہے۔ \"تصویر اپ لوڈ کریں\" کا بٹن نظر نہیں آئے گا، کیونکہ یہاں اپ لوڈ صرف Super Admin کر سکتا ہے — کسی اور کردار کو یہ اجازت نہیں دی جا سکتی۔",
+    help_signup_s3:"اگر گیلری میں کوئی تصویر شامل کرنی ہو تو وہ Super Admin اکاؤنٹ سے ہی اپ لوڈ کرنا ہوگی۔",
+    help_upload_title:"تصویر اپ لوڈ کرنا",
+    help_upload_intro:"یہ صرف Super Admin کے لیے دستیاب ہے۔",
+    help_upload_s1:"\"تصویر اپ لوڈ کریں\" دبائیں، ایک تصویری فائل (8 MB سے کم) منتخب کریں، چاہیں تو کیپشن شامل کریں، پھر \"اپ لوڈ کریں\" دبائیں۔",
+    help_upload_s2:"ہر تصویر خودکار طور پر ریکارڈ کرتی ہے کہ اسے کس نے اور بالکل کب اپ لوڈ کیا — یہ تصویر کے نیچے اور اس کے مکمل منظر میں دکھایا جاتا ہے۔",
+    help_view_title:"تصویر دیکھنا اور حذف کرنا",
+    help_view_intro:"گرڈ میں کسی بھی تصویر پر کلک کریں تاکہ اسے مکمل سائز میں، کیپشن اور اپ لوڈ کرنے والے کی تفصیل کے ساتھ دیکھا جا سکے۔",
+    help_view_s1:"کسی تصویر پر ماؤس لے جانے سے اس کے کونے میں ایک چھوٹا ✕ بٹن نظر آتا ہے — یہ صرف Super Admin کو نظر آتا ہے۔",
+    help_view_s2:"صرف Super Admin کوئی بھی تصویر حذف کر سکتا ہے، چاہے وہ اپنی اپ لوڈ کردہ ہو یا کسی اور کی۔",
+    help_admin_title:"عملے کے اکاؤنٹس کا انتظام (صرف Super Admin)",
+    help_admin_intro:"یہ صرف سب کا کردار دکھانے کے لیے ہے — یہ خود کسی کو گیلری اپ لوڈ کی اجازت نہیں دیتا، کیونکہ یہ اجازت صرف Super Admin کے پاس ہوتی ہے۔",
+    help_admin_s1:"\"Manage users\" کھول کر ہر اس اسٹاف ممبر کو دیکھیں جس نے سائن اپ کیا ہے، اس کے نام، عہدے، موبائل، CNIC، ای میل، اور کردار کے ساتھ۔",
+    help_admin_s2:"کسی نام کے سامنے \"سوٹ میں تبدیل کریں\" کھول کر سوٹ کے Admin Controls میں جائیں، جہاں کردار اصل میں تبدیل ہوتا ہے۔ گیلری اپ لوڈ/انتظام کی اجازت ہمیشہ Super Admin کردار کے ساتھ ہی آتی ہے — یہ یہاں الگ سے مقرر نہیں کی جاتی۔",
+    help_admin_s3:"کسی کی رسائی مکمل طور پر ختم کرنے کے لیے یہ سوٹ کے Admin Controls سے کریں — ان کا اکاؤنٹ تمام کیمپ آفس سسٹمز میں مشترکہ ہے، اسے صرف یہاں سے حذف نہیں کرنا چاہیے۔",
+    help_faqTitle:"اکثر پوچھے جانے والے سوالات",
+    help_faq1_q:"میں نے سائن اپ کر لیا لیکن \"تصویر اپ لوڈ کریں\" کا بٹن نظر نہیں آ رہا — کیوں؟",
+    help_faq1_a:"اس گیلری میں اپ لوڈ صرف Super Admin اکاؤنٹ کر سکتا ہے۔ کسی اور کردار کو — عام Admin سمیت — یہاں اپ لوڈ کی اجازت نہیں دی جا سکتی۔",
+    help_faq2_q:"Viewer، Data Entry، Admin، اور Super Admin میں یہاں کیا فرق ہے؟",
+    help_faq2_a:"اس گیلری میں صرف Super Admin اپ لوڈ کر سکتا، کوئی بھی تصویر حذف کر سکتا، اور اکاؤنٹس کا انتظام کر سکتا ہے۔ Viewer، Data Entry، اور عام Admin سب گیلری اور اسٹاف ڈائریکٹری دیکھ سکتے ہیں، مگر ان میں سے کوئی اپ لوڈ یا حذف نہیں کر سکتا۔",
+    help_faq3_q:"کیا میں کسی اور کی تصویر حذف کر سکتا ہوں؟",
+    help_faq3_a:"صرف Super Admin ہی کوئی تصویر حذف کر سکتا ہے، بشمول کسی اور کی اپ لوڈ کردہ۔",
+    help_faq4_q:"میں انگریزی اور اردو کے درمیان کیسے تبدیل کروں؟",
+    help_faq4_a:"اسکرین کے اوپر زبان منتخب کرنے والا خانہ استعمال کریں۔ یہ ہر شخص کی اپنی اسکرین کے مینو، لیبل، اور بٹن فوراً تبدیل کر دیتا ہے۔",
+    help_faq5_q:"تصاویر کہاں محفوظ ہیں — اگر یہ کمپیوٹر خراب ہو جائے تو کیا میرا ڈیٹا محفوظ ہے؟",
+    help_faq5_a:"تصاویر اور پروفائل ڈیٹا اس سسٹم کے مشترکہ Firebase پراجیکٹ میں آن لائن محفوظ ہوتے ہیں (تصویری فائلوں کے لیے Storage، تفصیلات کے لیے Firestore)، کسی ایک کمپیوٹر پر نہیں۔ اگر یہ کمپیوٹر گم ہو جائے، تو کچھ ضائع نہیں ہوتا — بس کسی اور کمپیوٹر سے دوبارہ سائن اِن کریں۔",
+    help_faq6_q:"کیا ایک سے زیادہ افراد بیک وقت گیلری استعمال کر سکتے ہیں؟",
+    help_faq6_a:"جی ہاں۔ سائن اِن ہر شخص وہی لائیو گیلری دیکھتا ہے، اور ایک شخص کی اپ لوڈ کردہ تصویر چند لمحوں میں سب کو نظر آ جاتی ہے۔",
+    help_faq7_q:"کیا تصویر کے سائز کی کوئی حد ہے؟",
+    help_faq7_a:"جی ہاں، ہر تصویر 8 MB سے کم ہونی چاہیے۔ اگر آپ کی تصویر بڑی ہے، تو اپ لوڈ سے پہلے اس کا سائز کم کریں۔",
+    help_faq8_q:"سائن اپ کرتے وقت میرے نام یا عہدے میں غلطی ہو گئی — کیا میں اسے ٹھیک کر سکتا ہوں؟",
+    help_faq8_a:"ابھی اپنی اسکرین سے نہیں — کسی Administrator سے کہیں، وہ اسے براہ راست Firebase Console کے \"users\" کلیکشن سے درست کر سکتا ہے۔",
+    help_faq9_q:"اپ لوڈ کے بعد تصویر میں کیپشن کیسے شامل کروں؟",
+    help_faq9_a:"اس ورژن میں کیپشن اپ لوڈ کے وقت ہی سیٹ ہوتا ہے۔ اگر تبدیل کرنا ہو تو تصویر حذف کر کے درست کیپشن کے ساتھ دوبارہ اپ لوڈ کریں۔",
+    help_faq10_q:"کونے میں موجود چھوٹا چیٹ بٹن کیا کرتا ہے؟",
+    help_faq10_a:"یہ ٹیم چیٹ کھولتا ہے، جہاں فی الحال سائن اِن ہر شخص ایک دوسرے کو پیغام بھیج سکتا ہے — گیلری دیکھتے ہوئے فوری رابطے کے لیے مفید۔",
+    help_faq11_q:"میں اپنا پاس ورڈ بھول گیا — کیا کروں؟",
+    help_faq11_a:"سائن اِن اسکرین پر \"Forgot password?\" پر کلک کریں، اپنا ای میل درج کریں، اور پاس ورڈ ری سیٹ لنک آپ کے ای میل پر بھیج دیا جائے گا (spam فولڈر بھی چیک کریں) — Administrator سے رابطے کی ضرورت نہیں۔",
+
+    chat_title:"ٹیم چیٹ", chat_typeMessage:"پیغام لکھیں…", chat_send:"بھیجیں",
+    chat_onlineCount:"{n} آن لائن", chat_noMessages:"ابھی تک کوئی پیغام نہیں — سلام کہیں!", chat_you:"آپ", chat_guest:"گیسٹ",
+    chat_recording:"ریکارڈنگ ہو رہی ہے — بھیجنے کے لیے 🎤 دوبارہ دبائیں، یا منسوخ کرنے کے لیے ✕",
+    chat_delete:"حذف کریں", chat_attach:"فائل منسلک کریں", chat_emoji:"ایموجی",
+    chat_fileTooBig:"فائل 10MB سے کم ہونی چاہیے۔", chat_uploadFailed:"فائل اپلوڈ ناکام ہو گئی۔",
+    chat_uploading:"اپلوڈ ہو رہا ہے… {p}%"
+  }
+};
+function t(key){
+  var lang = document.documentElement.getAttribute("data-ui-lang") || "en";
+  return (I18N_UI[lang] && I18N_UI[lang][key]!=null) ? I18N_UI[lang][key] : (I18N_UI.en[key]||key);
+}
+function applyUILang(lang){
+  if(!I18N_UI[lang]) lang = "en";
+  document.documentElement.setAttribute("data-ui-lang", lang);
+  document.body.classList.toggle("lang-ur", lang==="ur");
+  document.querySelectorAll("[data-i18n]").forEach(function(el){
+    var key = el.getAttribute("data-i18n");
+    var val = I18N_UI[lang][key];
+    if(val!=null) el.textContent = val;
+  });
+  document.querySelectorAll("[data-i18n-placeholder]").forEach(function(el){
+    var key = el.getAttribute("data-i18n-placeholder");
+    var val = I18N_UI[lang][key];
+    if(val!=null) el.setAttribute("placeholder", val);
+  });
+  var sel = document.getElementById("uiLangSelect");
+  if(sel) sel.value = lang;
+  try{ localStorage.setItem(UI_LANG_STORAGE_KEY, lang); }catch(e){}
+  renderGallery();
+  if(CURRENT_USER) applyRoleUI();
+  if(typeof renderChatOnline==="function") renderChatOnline();
+  if(typeof renderChatMessages==="function") renderChatMessages();
+}
+document.getElementById("uiLangSelect").addEventListener("change", function(){ applyUILang(this.value); });
+(function initUILang(){
+  var saved = "en";
+  try{ saved = localStorage.getItem(UI_LANG_STORAGE_KEY) || "en"; }catch(e){}
+  applyUILang(saved);
+})();
+
+/* ---------------- Auth screens ----------------
+   Sign-in and account creation now happen in ONE place only — the main Camp
+   Office portal (camp-office-suite, one level up). Signing in there signs
+   you in here too (same shared Firebase project/session), so this page
+   never needs to show its own login/sign-up form: if it ever finds itself
+   signed out, it just sends the visitor back to the portal to sign in.
+   Name/designation/mobile/CNIC/photo also now live in one place only — the
+   Employee Directory in the portal (admin-maintained) — instead of being
+   collected again here at sign-up. */
+function showLogin(){ location.href = "../"; }
+function showSetup(){ location.href = "../"; }
+
+/* ---------------- Sign-up: optional profile picture (uploaded to Cloudinary as soon as
+   it's picked, same as the gallery's own photo uploads — the account doesn't exist yet
+   at this point, so there's no uid to attach it to server-side until "Create account"
+   is pressed; the URL is just held here in the meantime). ---------------- */
+var setupPhotoURL = null;
+(function(){
+  var fileInp = document.getElementById("setupPhotoFile");
+  var wrap = document.getElementById("setupPhotoPreviewWrap");
+  var preview = document.getElementById("setupPhotoPreview");
+  var removeBtn = document.getElementById("setupPhotoRemoveBtn");
+  var progress = document.getElementById("setupPhotoProgress");
+  if(!fileInp) return;
+  fileInp.addEventListener("change", function(){
+    var f = fileInp.files && fileInp.files[0];
+    if(!f) return;
+    if(!/^image\//.test(f.type)){ toast("Please choose an image file."); fileInp.value = ""; return; }
+    if(f.size > 2*1024*1024){ toast("Profile picture should be under 2MB."); fileInp.value = ""; return; }
+    var fd = new FormData();
+    fd.append("file", f);
+    fd.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+    var xhr = new XMLHttpRequest();
+    xhr.open("POST", "https://api.cloudinary.com/v1_1/" + CLOUDINARY_CLOUD_NAME + "/image/upload");
+    if(progress){ progress.style.display = "block"; progress.textContent = "Uploading… 0%"; }
+    xhr.upload.onprogress = function(ev){
+      if(ev.lengthComputable && progress){ progress.textContent = "Uploading… " + Math.round(ev.loaded/ev.total*100) + "%"; }
+    };
+    xhr.onload = function(){
+      if(progress) progress.style.display = "none";
+      fileInp.value = "";
+      try{
+        var res = JSON.parse(xhr.responseText);
+        if(res && res.secure_url){
+          setupPhotoURL = res.secure_url;
+          if(preview && wrap){ preview.src = res.secure_url; wrap.style.display = "inline-block"; }
+          toast("Profile picture ready.");
+        } else { toast("Profile picture upload failed."); }
+      }catch(e){ toast("Profile picture upload failed."); }
+    };
+    xhr.onerror = function(){ if(progress) progress.style.display = "none"; toast("Profile picture upload failed — check your internet connection."); };
+    xhr.send(fd);
+  });
+  if(removeBtn){
+    removeBtn.addEventListener("click", function(){
+      setupPhotoURL = null;
+      if(wrap) wrap.style.display = "none";
+      if(preview) preview.src = "";
+    });
+  }
+})();
+function showApp(){
+  document.getElementById("authLoginScreen").style.display = "none";
+  document.getElementById("authSetupScreen").style.display = "none";
+  document.getElementById("appMain").style.display = "block";
+  var curTheme = document.documentElement.getAttribute("data-theme") || "navy";
+  var themeSel = document.getElementById("themeSwitcher"); if(themeSel) themeSel.value = curTheme;
+}
+document.getElementById("goToSignupBtn").addEventListener("click", showSetup);
+document.getElementById("forgotPasswordLink").addEventListener("click", function(e){{
+  e.preventDefault();
+  var email = document.getElementById("login_username").value.trim();
+  var errEl = document.getElementById("loginError");
+  if(!email){{ errEl.style.color = "#b00020"; errEl.textContent = "Please enter your email address above first, then click 'Forgot password?' again."; return; }}
+  auth.sendPasswordResetEmail(email).then(function(){{
+    errEl.style.color = "#1a7a1a";
+    errEl.textContent = "A password reset link has been sent to " + email + ". Please check your inbox (and spam folder).";
+  }}).catch(function(err){{
+    errEl.style.color = "#b00020";
+    errEl.textContent = err.message;
+  }});
+}});
+
+document.getElementById("backToLoginBtn").addEventListener("click", showLogin);
+
+document.getElementById("setupBtn").addEventListener("click", function(){
+  var name = document.getElementById("setup_name").value.trim();
+  var designation = document.getElementById("setup_designation").value.trim();
+  var mobile = document.getElementById("setup_mobile").value.trim();
+  var cnic = document.getElementById("setup_cnic").value.trim();
+  var email = document.getElementById("setup_username").value.trim();
+  var pass = document.getElementById("setup_password").value;
+  var pass2 = document.getElementById("setup_password2").value;
+  var errEl = document.getElementById("setupError");
+  errEl.textContent = "";
+  if(!name || !designation){ errEl.textContent = "Please enter your name and designation."; return; }
+  if(mobile && mobile.replace(/\D/g,"").length < 10){ errEl.textContent = "Please enter a valid mobile number, or leave it blank."; return; }
+  if(!cnic){ errEl.textContent = "Please enter your CNIC number."; return; }
+  if(cnic.replace(/\D/g,"").length !== 13){ errEl.textContent = "CNIC should have 13 digits (e.g. 12345-1234567-1)."; return; }
+  if(!email || !pass){ errEl.textContent = "Please enter an email and password."; return; }
+  if(pass !== pass2){ errEl.textContent = "Passwords do not match."; return; }
+  if(pass.length < 8 || !/[A-Za-z]/.test(pass) || !/[0-9]/.test(pass)){ errEl.textContent = "Password must be at least 8 characters and include both letters and numbers."; return; }
+  auth.createUserWithEmailAndPassword(email, pass).then(function(cred){
+    return db.collection("users").doc(cred.user.uid).set({
+      name: name, designation: designation, mobile: mobile, cnic: cnic, email: email,
+      role: "guest",
+      permissions: { adminBranch: false, recordBranch: false, accountsBranch: false },
+      galleryStatus: "pending",
+      photoURL: setupPhotoURL || null,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  }).catch(function(err){ errEl.textContent = err.message; });
+});
+
+document.getElementById("loginBtn").addEventListener("click", function(){
+  var btn = document.getElementById("loginBtn");
+  if(btn.disabled) return; /* guard against double-clicks while a sign-in is already in progress */
+  var email = document.getElementById("login_username").value.trim();
+  var pass = document.getElementById("login_password").value;
+  var errEl = document.getElementById("loginError");
+  errEl.textContent = "";
+  if(!email || !pass){ errEl.textContent = "Please enter your email and password."; return; }
+  btn.disabled = true; btn.textContent = t("auth_signingIn"); /* visible feedback so the button never looks stuck/frozen */
+  auth.signInWithEmailAndPassword(email, pass).catch(function(err){
+    errEl.textContent = err.message;
+    btn.disabled = false; btn.textContent = t("auth_signin");
+  });
+});
+
+document.getElementById("signOutBtn").addEventListener("click", function(){ auth.signOut(); });
+
+/* ---------------- Auth state / role ---------------- */
+auth.onAuthStateChanged(function(user){
+  if(galleryUnsub){ galleryUnsub(); galleryUnsub = null; }
+  if(!user){ spinClearVerified(CURRENT_USER && CURRENT_USER.uid); CURRENT_USER = null; stopChat(); showLogin(); return; }
+  var chatStarted = false;
+  var gateDone = false;
+  db.collection("users").doc(user.uid).onSnapshot(function(doc){
+    if(!doc.exists){
+      // Profile document missing (shouldn't normally happen) — sign out.
+      auth.signOut();
+      return;
+    }
+    var d = doc.data();
+    var globalRole = (d.roleV2==="admin" || d.roleV2==="super_admin") ? "admin" : "guest"; /* roleV2 is the one true source now -- a stale legacy "role" field on the doc must never override it */
+    var effectiveGalleryStatus = (d.roleV2==="super_admin") ? "admin" : "pending"; /* derived from roleV2 only -- ONLY the Super Admin can upload/manage photos here; everyone else (Admin, Data Entry, Viewer) is view-only, per explicit instruction */
+    CURRENT_USER = { uid:user.uid, email:user.email, name:d.name||"", designation:d.designation||"", mobile:d.mobile||"", cnic:d.cnic||"", role:globalRole, galleryStatus:effectiveGalleryStatus, photoURL:d.photoURL||null, isSuperAdmin:(d.roleV2==="super_admin") };
+    if(d.theme) applyTheme(d.theme);
+    function revealGalleryApp(){
+      showApp();
+      applyRoleUI();
+      subscribeGallery();
+      if(!chatStarted){ chatStarted = true; startChat(); }
+    }
+    if(!gateDone){
+      spinGate(user.uid, d, function(){ gateDone = true; revealGalleryApp(); });
+    } else {
+      revealGalleryApp();
+    }
+  }, function(err){
+    toast("Could not load your profile: " + err.message);
+  });
+});
+
+/* ================= TEAM CHAT ================= */
+var CHAT_MESSAGES = [];
+var CHAT_PRESENCE = {};        /* uid -> {email, role, lastSeen(ms)} */
+var chatUnsubMessages = null;
+var chatUnsubPresence = null;
+var chatHeartbeatTimer = null;
+var chatUnreadCount = 0;
+var CHAT_ONLINE_WINDOW_MS = 60000;   /* consider a user "online" if seen within the last 60s */
+var CHAT_HEARTBEAT_MS = 25000;
+
+function chatDisplayName(msg){
+  if(!msg) return "?";
+  return msg.senderName || (msg.senderEmail? msg.senderEmail.split("@")[0] : "?");
+}
+function tsToMillis(ts){
+  if(!ts) return 0;
+  if(typeof ts.toMillis==="function") return ts.toMillis();
+  if(ts.seconds!=null) return ts.seconds*1000;
+  return 0;
+}
+function fmtChatTime(ms){
+  if(!ms) return "";
+  var d = new Date(ms);
+  var h = d.getHours(), m = d.getMinutes();
+  var ap = h>=12? "PM":"AM";
+  var h12 = h%12; if(h12===0) h12=12;
+  return h12+":"+(m<10?"0":"")+m+" "+ap;
+}
+function startChat(){
+  if(!CURRENT_USER) return;
+  stopChat(); /* guard against double-start */
+
+  var chatFirstSnapshot = true;
+  chatUnsubMessages = db.collection("chatMessages").orderBy("timestamp","desc").limit(150)
+    .onSnapshot(function(snap){
+      var list = [];
+      snap.forEach(function(doc){ var d = doc.data(); d.id = doc.id; list.push(d); });
+      list.reverse();
+      CHAT_MESSAGES = list;
+      if(!chatFirstSnapshot){
+        var panel = document.getElementById("chatPanel");
+        var isOpen = panel && panel.classList.contains("open");
+        snap.docChanges().forEach(function(ch){
+          if(ch.type==="added"){
+            var d = ch.doc.data();
+            if(!isOpen && (!CURRENT_USER || d.senderUid!==CURRENT_USER.uid)) chatUnreadCount++;
+          }
+        });
+        updateChatBadge();
+      }
+      chatFirstSnapshot = false;
+      renderChatMessages();
+    }, function(err){
+      /* Most likely cause: Firestore security rules on this project don't
+         yet allow the "chatMessages" collection — see the rules file for
+         the block that needs to be added. Fail quietly in the UI. */
+      console.error("Chat messages listener error:", err);
+    });
+
+  chatUnsubPresence = db.collection("presence").onSnapshot(function(snap){
+    var map = {};
+    snap.forEach(function(doc){
+      var d = doc.data();
+      map[doc.id] = {email:d.email, galleryStatus:d.role, lastSeen:tsToMillis(d.lastSeen)};
+    });
+    CHAT_PRESENCE = map;
+    renderChatOnline();
+  }, function(err){
+    console.error("Presence listener error:", err);
+  });
+
+  sendPresenceHeartbeat();
+  chatHeartbeatTimer = setInterval(sendPresenceHeartbeat, CHAT_HEARTBEAT_MS);
+}
+function stopChat(){
+  if(chatUnsubMessages){ chatUnsubMessages(); chatUnsubMessages = null; }
+  if(chatUnsubPresence){ chatUnsubPresence(); chatUnsubPresence = null; }
+  if(chatHeartbeatTimer){ clearInterval(chatHeartbeatTimer); chatHeartbeatTimer = null; }
+  CHAT_MESSAGES = [];
+  CHAT_PRESENCE = {};
+  chatUnreadCount = 0;
+  updateChatBadge();
+}
+function sendPresenceHeartbeat(){
+  if(!CURRENT_USER) return;
+  db.collection("presence").doc(CURRENT_USER.uid).set({
+    email: CURRENT_USER.email,
+    role: CURRENT_USER.galleryStatus,
+    lastSeen: firebase.firestore.FieldValue.serverTimestamp()
+  }, {merge:true}).catch(function(err){ console.error("Presence heartbeat failed:", err); });
+}
+function renderChatOnline(){
+  var lang = document.documentElement.getAttribute("data-ui-lang") || "en";
+  var now = Date.now();
+  var n = 0;
+  var presence = CHAT_PRESENCE || {};
+  Object.keys(presence).forEach(function(uid){
+    if(now - presence[uid].lastSeen < CHAT_ONLINE_WINDOW_MS) n++;
+  });
+  var label = (I18N_UI[lang].chat_onlineCount || "{n} online").replace("{n}", n);
+  var el = document.getElementById("chatOnlineLabel");
+  if(el) el.textContent = label;
+}
+function escChat(s){
+  s = (s==null)? "" : String(s);
+  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+function renderChatMessages(){
+  var lang = document.documentElement.getAttribute("data-ui-lang") || "en";
+  var body = document.getElementById("chatMessages");
+  if(!body) return;
+  var wasNearBottom = (body.scrollHeight - body.scrollTop - body.clientHeight) < 60;
+  body.innerHTML = "";
+  CHAT_MESSAGES = CHAT_MESSAGES || [];
+  if(CHAT_MESSAGES.length===0){
+    body.innerHTML = "<div class='chat-empty'>"+escChat(I18N_UI[lang].chat_noMessages||"No messages yet — say hello!")+"</div>";
+    return;
+  }
+  CHAT_MESSAGES.forEach(function(msg){
+    var mine = CURRENT_USER && msg.senderUid===CURRENT_USER.uid;
+    var name = mine? (I18N_UI[lang].chat_you||"You") : chatDisplayName(msg);
+    var time = fmtChatTime(tsToMillis(msg.timestamp));
+    var canDelete = !!(msg.id && (mine || (CURRENT_USER && CURRENT_USER.galleryStatus==="admin")));
+    var div = document.createElement("div");
+    div.className = "chat-msg"+(mine?" mine":"");
+    var bubbleHtml;
+    if(msg.fileURL && msg.fileType==="image"){
+      bubbleHtml = "<img class='chat-msg-image' src='"+escChat(msg.fileURL)+"' alt='"+escChat(msg.fileName||"image")+"' onclick=\"window.open('"+escChat(msg.fileURL)+"','_blank')\">";
+      if(msg.text) bubbleHtml += "<div style='margin-top:4px;'>"+escChat(msg.text)+"</div>";
+    } else if(msg.fileURL){
+      bubbleHtml = "<a class='chat-msg-file' href='"+escChat(msg.fileURL)+"' target='_blank' rel='noopener'>📄 "+escChat(msg.fileName||"file")+"</a>";
+      if(msg.text) bubbleHtml += "<div style='margin-top:4px;'>"+escChat(msg.text)+"</div>";
+    } else if(msg.audioURL){
+      bubbleHtml = "<audio controls src='"+escChat(msg.audioURL)+"' style='max-width:220px;height:34px;display:block;'></audio>";
+    } else {
+      bubbleHtml = escChat(msg.text);
+    }
+    var delHtml = canDelete ? "<button type='button' class='chat-msg-del' data-id='"+escChat(msg.id)+"'>"+escChat(t("chat_delete"))+"</button>" : "";
+    div.innerHTML = "<div class='chat-msg-meta'>"+escChat(name)+(time? " · "+escChat(time):"")+"</div>"+
+      "<div class='chat-msg-bubble'>"+bubbleHtml+"</div>"+delHtml;
+    body.appendChild(div);
+  });
+  if(wasNearBottom) body.scrollTop = body.scrollHeight;
+}
+function updateChatBadge(){
+  var badge = document.getElementById("chatBadge");
+  if(!badge) return;
+  if(chatUnreadCount>0){ badge.style.display="flex"; badge.textContent = chatUnreadCount>99? "99+":chatUnreadCount; }
+  else { badge.style.display="none"; }
+}
+function sendChatMessage(){
+  if(!CURRENT_USER) return;
+  var input = document.getElementById("chatInput");
+  var text = input.value.trim();
+  if(!text) return;
+  input.value = "";
+  db.collection("chatMessages").add({
+    text: text,
+    senderUid: CURRENT_USER.uid,
+    senderEmail: CURRENT_USER.email,
+    senderName: CURRENT_USER.name || (CURRENT_USER.email? CURRENT_USER.email.split("@")[0] : ""),
+    senderRole: CURRENT_USER.galleryStatus,
+    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+  }).catch(function(err){
+    toast("Could not send message: "+err.message);
+    input.value = text; /* give it back so nothing is lost */
+  });
+}
+document.getElementById("chatSendBtn").addEventListener("click", sendChatMessage);
+document.getElementById("chatInput").addEventListener("keydown", function(ev){
+  if(ev.key==="Enter" && !ev.shiftKey){ ev.preventDefault(); sendChatMessage(); }
+});
+
+function deleteChatMessage(id){
+  if(!id) return;
+  db.collection("chatMessages").doc(id).delete().catch(function(err){
+    toast("Could not delete message: "+err.message);
+  });
+}
+document.getElementById("chatMessages").addEventListener("click", function(ev){
+  if(ev.target.classList && ev.target.classList.contains("chat-msg-del")){
+    deleteChatMessage(ev.target.getAttribute("data-id"));
+  }
+});
+(function(){
+  var attachBtn = document.getElementById("chatAttachBtn");
+  var fileInput = document.getElementById("chatFileInput");
+  var progressEl = document.getElementById("chatUploadProgress");
+  if(attachBtn && fileInput){
+    attachBtn.addEventListener("click", function(){ fileInput.click(); });
+    fileInput.addEventListener("change", function(){
+      var f = fileInput.files && fileInput.files[0];
+      fileInput.value = "";
+      if(!f) return;
+      if(!CURRENT_USER) return;
+      if(f.size > 10*1024*1024){ toast(t("chat_fileTooBig")); return; }
+      var isImage = /^image\//.test(f.type);
+      var fd = new FormData();
+      fd.append("file", f);
+      fd.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+      var endpoint = "https://api.cloudinary.com/v1_1/"+CLOUDINARY_CLOUD_NAME+"/"+(isImage? "image":"auto")+"/upload";
+      var xhr = new XMLHttpRequest();
+      xhr.open("POST", endpoint);
+      if(progressEl){ progressEl.style.display = "block"; progressEl.textContent = t("chat_uploading").replace("{p}","0"); }
+      xhr.upload.onprogress = function(ev){
+        if(ev.lengthComputable && progressEl){ progressEl.textContent = t("chat_uploading").replace("{p}", Math.round(ev.loaded/ev.total*100)); }
+      };
+      xhr.onload = function(){
+        if(progressEl) progressEl.style.display = "none";
+        try{
+          var res = JSON.parse(xhr.responseText);
+          if(res && res.secure_url){
+            db.collection("chatMessages").add({
+              text: "",
+              fileURL: res.secure_url,
+              fileName: f.name,
+              fileType: isImage? "image":"file",
+              senderUid: CURRENT_USER.uid,
+              senderEmail: CURRENT_USER.email,
+              senderName: CURRENT_USER.name || (CURRENT_USER.email? CURRENT_USER.email.split("@")[0] : ""),
+              senderRole: CURRENT_USER.galleryStatus,
+              timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            }).catch(function(err){ toast("Could not send file: "+err.message); });
+          } else { toast(t("chat_uploadFailed")); }
+        }catch(e){ toast(t("chat_uploadFailed")); }
+      };
+      xhr.onerror = function(){ if(progressEl) progressEl.style.display = "none"; toast(t("chat_uploadFailed")); };
+      xhr.send(fd);
+    });
+  }
+  var CHAT_EMOJIS = ["😀","😂","😊","😍","👍","👏","🙏","🎉","❤️","😢","😮","😡","🤔","👌","🔥","✅","❌","📌","📅","⏰","💬","☕","🙌","😴"];
+  var emojiBtn = document.getElementById("chatEmojiBtn");
+  var emojiPicker = document.getElementById("chatEmojiPicker");
+  if(emojiBtn && emojiPicker){
+    emojiPicker.innerHTML = CHAT_EMOJIS.map(function(e){ return "<span>"+e+"</span>"; }).join("");
+    emojiBtn.addEventListener("click", function(ev){
+      ev.stopPropagation();
+      emojiPicker.classList.toggle("open");
+    });
+    emojiPicker.addEventListener("click", function(ev){
+      if(ev.target.tagName==="SPAN"){
+        var input = document.getElementById("chatInput");
+        input.value += ev.target.textContent;
+        input.focus();
+        emojiPicker.classList.remove("open");
+      }
+    });
+    document.addEventListener("click", function(ev){
+      if(emojiPicker.classList.contains("open") && ev.target!==emojiBtn && !emojiPicker.contains(ev.target)){
+        emojiPicker.classList.remove("open");
+      }
+    });
+  }
+})();
+
+/* ---------------- Voice messages (record with the mic, upload to Cloudinary as an
+   audio file, send as a chat message) — item 32: recorded voice notes, not a live call. ---------------- */
+var micRecorder = null;
+var micStream = null;
+var micRecording = false;
+var micCancelRequested = false;
+var micStartTime = 0;
+var micTimerInterval = null;
+
+function micSupported(){
+  return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
+}
+function formatMicTime(ms){
+  var s = Math.max(0, Math.floor(ms/1000));
+  var m = Math.floor(s/60);
+  s = s % 60;
+  return m + ":" + (s<10? "0"+s : s);
+}
+function micUpdateTimer(){
+  var el = document.getElementById("chatMicTimer");
+  if(el) el.textContent = formatMicTime(Date.now() - micStartTime);
+  if(Date.now() - micStartTime > 120000){ stopMicRecording(false); } /* 2-minute safety cap, then auto-send */
+}
+function uploadVoiceMessage(blob, durationMs){
+  var fd = new FormData();
+  fd.append("file", blob, "voice_" + Date.now() + ".webm");
+  fd.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+  var xhr = new XMLHttpRequest();
+  /* Cloudinary handles audio files through its "video" resource type endpoint —
+     this is the standard Cloudinary pattern for any non-image upload (audio/video). */
+  xhr.open("POST", "https://api.cloudinary.com/v1_1/" + CLOUDINARY_CLOUD_NAME + "/video/upload");
+  toast("Uploading voice message…");
+  xhr.onload = function(){
+    try{
+      var res = JSON.parse(xhr.responseText);
+      if(res && res.secure_url){
+        db.collection("chatMessages").add({
+          text: "",
+          audioURL: res.secure_url,
+          audioDurationMs: durationMs,
+          senderUid: CURRENT_USER.uid,
+          senderEmail: CURRENT_USER.email,
+          senderName: CURRENT_USER.name || (CURRENT_USER.email? CURRENT_USER.email.split("@")[0] : ""),
+          senderRole: CURRENT_USER.galleryStatus,
+          timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        }).catch(function(err){ toast("Could not send voice message: " + err.message); });
+      } else {
+        toast("Voice message upload failed. (If this keeps happening, check that the Cloudinary upload preset allows audio/video files.)");
+      }
+    }catch(e){ toast("Voice message upload failed."); }
+  };
+  xhr.onerror = function(){ toast("Voice message upload failed — check your internet connection."); };
+  xhr.send(fd);
+}
+function startMicRecording(){
+  if(!CURRENT_USER) return;
+  if(!micSupported()){ toast("Voice messages are not supported in this browser."); return; }
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ toast("Voice messages need a secure (https) connection or a supported browser."); return; }
+  micCancelRequested = false;
+  navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
+    micStream = stream;
+    var chunks = [];
+    var recorder;
+    try{
+      recorder = new MediaRecorder(stream);
+    }catch(e){
+      toast("Could not start recording: " + e.message);
+      stream.getTracks().forEach(function(t){ t.stop(); });
+      return;
+    }
+    micRecorder = recorder;
+    var recordedStartTime = Date.now();
+    recorder.ondataavailable = function(ev){ if(ev.data && ev.data.size > 0) chunks.push(ev.data); };
+    recorder.onstop = function(){
+      micStream.getTracks().forEach(function(t){ t.stop(); });
+      micStream = null;
+      var durationMs = Date.now() - recordedStartTime;
+      if(micCancelRequested || chunks.length === 0) return;
+      var blob = new Blob(chunks, {type: recorder.mimeType || "audio/webm"});
+      if(blob.size > 0) uploadVoiceMessage(blob, durationMs);
+    };
+    recorder.start();
+    micRecording = true;
+    micStartTime = recordedStartTime;
+    var statusEl = document.getElementById("chatMicStatus");
+    if(statusEl) statusEl.style.display = "flex";
+    var micBtn = document.getElementById("chatMicBtn");
+    if(micBtn) micBtn.textContent = "⏹";
+    if(micTimerInterval) clearInterval(micTimerInterval);
+    micTimerInterval = setInterval(micUpdateTimer, 500);
+    micUpdateTimer();
+  }).catch(function(err){
+    toast("Microphone access was not granted: " + err.message);
+  });
+}
+function stopMicRecording(cancel){
+  if(!micRecorder || !micRecording) return;
+  micCancelRequested = !!cancel;
+  micRecording = false;
+  if(micTimerInterval){ clearInterval(micTimerInterval); micTimerInterval = null; }
+  var statusEl = document.getElementById("chatMicStatus");
+  if(statusEl) statusEl.style.display = "none";
+  var micBtn = document.getElementById("chatMicBtn");
+  if(micBtn) micBtn.textContent = "🎤";
+  try{ micRecorder.stop(); }catch(e){}
+}
+document.getElementById("chatMicBtn").addEventListener("click", function(){
+  if(micRecording){ stopMicRecording(false); }
+  else { startMicRecording(); }
+});
+document.getElementById("chatMicCancelBtn").addEventListener("click", function(){
+  stopMicRecording(true);
+});
+document.getElementById("chatToggleBtn").addEventListener("click", function(){
+  var panel = document.getElementById("chatPanel");
+  var opening = !panel.classList.contains("open");
+  panel.classList.toggle("open");
+  if(opening){
+    chatUnreadCount = 0;
+    updateChatBadge();
+    var body = document.getElementById("chatMessages");
+    if(body) body.scrollTop = body.scrollHeight;
+    document.getElementById("chatInput").focus();
+  }
+});
+document.getElementById("chatCloseBtn").addEventListener("click", function(){
+  document.getElementById("chatPanel").classList.remove("open");
+});
+
+/* ================= HELP / GUIDE OVERLAY ================= */
+document.getElementById("btnHelp").addEventListener("click", function(){
+  document.getElementById("helpOverlay").style.display = "flex";
+});
+document.getElementById("helpCloseBtn").addEventListener("click", function(){
+  document.getElementById("helpOverlay").style.display = "none";
+});
+
+function applyRoleUI(){
+  if(!CURRENT_USER) return;
+  document.getElementById("whoAmI").textContent = (CURRENT_USER.name || (CURRENT_USER.email? CURRENT_USER.email.split("@")[0] : "")) + (CURRENT_USER.designation? (" — "+CURRENT_USER.designation) : "");
+  /* (3 Oct 2026) Only Super Admin gets the gallery's "admin" tier now (no plain-admin
+     tier exists here anymore), so show "Super Admin" specifically instead of the more
+     generic "Administrator" label -- matches what the other systems now show for the
+     same account, instead of this one looking different. */
+  document.getElementById("roleChip").textContent = t(CURRENT_USER.galleryStatus==="admin"? (CURRENT_USER.isSuperAdmin? "role_superAdmin" : "role_admin") : "role_guest");
+  document.body.classList.toggle("guest-mode", CURRENT_USER.galleryStatus === "pending");
+  document.getElementById("uploadOpenBtn").style.display = (CURRENT_USER.galleryStatus === "pending") ? "none" : "";
+  document.getElementById("adminPanelBtn").style.display = (CURRENT_USER.isSuperAdmin === true) ? "" : "none"; /* Managing gallery accounts is now Super Admin-only, not every gallery "admin" -- keeps user management in one place */
+}
+
+/* ---------------- Gallery ---------------- */
+function subscribeGallery(){
+  if(galleryUnsub){ galleryUnsub(); }
+  galleryUnsub = db.collection("gallery_photos").orderBy("uploadedAt","desc").onSnapshot(function(snap){
+    GALLERY_ITEMS = [];
+    snap.forEach(function(doc){ GALLERY_ITEMS.push(Object.assign({id:doc.id}, doc.data())); });
+    renderGallery();
+  }, function(err){ toast("Could not load gallery: " + err.message); });
+}
+function renderGallery(){
+  var grid = document.getElementById("galleryGrid");
+  var empty = document.getElementById("emptyState");
+  var chip = document.getElementById("photoCountChip");
+  if(!grid) return;
+  chip.textContent = GALLERY_ITEMS.length + (GALLERY_ITEMS.length===1? " photo" : " photos");
+  if(!GALLERY_ITEMS.length){ grid.innerHTML = ""; empty.style.display = "block"; return; }
+  empty.style.display = "none";
+  grid.innerHTML = GALLERY_ITEMS.map(function(p){
+    var canDelete = CURRENT_USER && (CURRENT_USER.galleryStatus === "admin" || CURRENT_USER.uid === p.uploadedBy);
+    return "<div class='gphoto' data-id='"+esc(p.id)+"'>"+
+      "<img src='"+esc(p.imageURL)+"' alt='' loading='lazy'>"+
+      (canDelete? "<button class='del-btn' data-del='"+esc(p.id)+"' title='Delete'>&times;</button>" : "")+
+      "<div class='meta'><b>"+esc(p.uploadedByName)+"</b>"+(p.uploadedByDesignation? (esc(p.uploadedByDesignation)+"<br>") : "")+esc(fmtDate(p.uploadedAt))+"</div>"+
+      "</div>";
+  }).join("");
+  grid.querySelectorAll(".gphoto").forEach(function(el){
+    el.addEventListener("click", function(e){
+      if(e.target.closest(".del-btn")) return;
+      openViewer(el.getAttribute("data-id"));
+    });
+  });
+  grid.querySelectorAll(".del-btn").forEach(function(btn){
+    btn.addEventListener("click", function(e){
+      e.stopPropagation();
+      deletePhoto(btn.getAttribute("data-del"));
+    });
+  });
+}
+
+/* ---------------- Upload modal ---------------- */
+var uploadModal = document.getElementById("uploadModal");
+document.getElementById("uploadOpenBtn").addEventListener("click", function(){
+  document.getElementById("uploadFileInput").value = "";
+  document.getElementById("uploadCaption").value = "";
+  document.getElementById("uploadProgressHint").textContent = "";
+  uploadModal.classList.add("show");
+});
+document.getElementById("uploadCancelBtn").addEventListener("click", function(){ uploadModal.classList.remove("show"); });
+uploadModal.addEventListener("click", function(e){ if(e.target === uploadModal) uploadModal.classList.remove("show"); });
+
+document.getElementById("uploadConfirmBtn").addEventListener("click", function(){
+  if(!CURRENT_USER || CURRENT_USER.galleryStatus === "pending"){ toast("Your account is still pending approval."); return; }
+  var fileInput = document.getElementById("uploadFileInput");
+  var file = fileInput.files && fileInput.files[0];
+  var caption = document.getElementById("uploadCaption").value.trim();
+  var hint = document.getElementById("uploadProgressHint");
+  if(!file){ hint.textContent = "Please choose an image file."; return; }
+  if(!/^image\//.test(file.type)){ hint.textContent = "Please choose an image file."; return; }
+  if(file.size > 8*1024*1024){ hint.textContent = "Please choose an image smaller than 8 MB."; return; }
+  var id = db.collection("gallery_photos").doc().id;
+  hint.textContent = "Uploading… 0%";
+  document.getElementById("uploadConfirmBtn").disabled = true;
+
+  /* Upload the actual image file straight to Cloudinary (unsigned preset —
+     see the CLOUDINARY_CLOUD_NAME / CLOUDINARY_UPLOAD_PRESET note near the
+     top of this script). We use XMLHttpRequest instead of fetch() only so we
+     can show a real upload-progress percentage in uploadProgressHint. */
+  var formData = new FormData();
+  formData.append("file", file);
+  formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+
+  var xhr = new XMLHttpRequest();
+  xhr.open("POST", "https://api.cloudinary.com/v1_1/" + CLOUDINARY_CLOUD_NAME + "/image/upload", true);
+  xhr.upload.onprogress = function(e){
+    if(e.lengthComputable){
+      hint.textContent = "Uploading… " + Math.round((e.loaded / e.total) * 100) + "%";
+    }
+  };
+  xhr.onload = function(){
+    document.getElementById("uploadConfirmBtn").disabled = false;
+    var res;
+    try{ res = JSON.parse(xhr.responseText); }catch(e){ res = null; }
+    if(xhr.status < 200 || xhr.status >= 300 || !res || !res.secure_url){
+      var msg = (res && res.error && res.error.message) ? res.error.message : ("HTTP " + xhr.status);
+      hint.textContent = "Upload failed: " + msg;
+      return;
+    }
+    db.collection("gallery_photos").doc(id).set({
+      imageURL: res.secure_url,
+      cloudinaryPublicId: res.public_id || "",
+      caption: caption,
+      uploadedBy: CURRENT_USER.uid,
+      uploadedByName: CURRENT_USER.name || (CURRENT_USER.email? CURRENT_USER.email.split("@")[0] : ""),
+      uploadedByDesignation: CURRENT_USER.designation || "",
+      uploadedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }).then(function(){
+      uploadModal.classList.remove("show");
+      toast("Photo uploaded.");
+    }).catch(function(err){
+      hint.textContent = "Upload failed: " + err.message;
+    });
+  };
+  xhr.onerror = function(){
+    document.getElementById("uploadConfirmBtn").disabled = false;
+    hint.textContent = "Upload failed: network error. Please check your internet connection and try again.";
+  };
+  xhr.send(formData);
+});
+
+function deletePhoto(id){
+  var item = GALLERY_ITEMS.find(function(p){ return p.id === id; });
+  if(!item) return;
+  if(!confirm("Delete this photo? This cannot be undone.")) return;
+  /* Cloudinary's free "unsigned upload" method (used above) has no matching
+     unsigned DELETE — removing the actual image file requires the account's
+     API Secret via a signed Admin API call, and that secret must never be
+     placed in this file. So "delete" here removes the photo from this
+     gallery app (the Firestore record) only; the image file itself stays
+     stored in the Cloudinary account (well within the free 25 GB quota). */
+  db.collection("gallery_photos").doc(id).delete().then(function(){
+    toast("Photo deleted.");
+  }).catch(function(err){ toast("Could not delete: " + err.message); });
+}
+
+/* ---------------- Viewer modal ---------------- */
+var viewerModal = document.getElementById("viewerModal");
+function openViewer(id){
+  var p = GALLERY_ITEMS.find(function(x){ return x.id === id; });
+  if(!p) return;
+  document.getElementById("viewerImg").src = p.imageURL;
+  document.getElementById("viewerMeta").innerHTML =
+    (p.caption? ("<b>"+esc(p.caption)+"</b><br>") : "") +
+    esc(p.uploadedByName) + (p.uploadedByDesignation? (", "+esc(p.uploadedByDesignation)) : "") + "<br>" +
+    esc(fmtDate(p.uploadedAt));
+  viewerModal.classList.add("show");
+}
+document.getElementById("viewerCloseBtn").addEventListener("click", function(){ viewerModal.classList.remove("show"); });
+viewerModal.addEventListener("click", function(e){ if(e.target === viewerModal) viewerModal.classList.remove("show"); });
+
+/* ---------------- Admin: manage users ---------------- */
+var adminModal = document.getElementById("adminModal");
+document.getElementById("adminPanelBtn").addEventListener("click", function(){
+  if(!CURRENT_USER || CURRENT_USER.isSuperAdmin !== true){ toast("Only a Super Admin can manage accounts here."); return; }
+  loadAdminUsers();
+  adminModal.classList.add("show");
+});
+document.getElementById("adminCloseBtn").addEventListener("click", function(){ adminModal.classList.remove("show"); });
+adminModal.addEventListener("click", function(e){ if(e.target === adminModal) adminModal.classList.remove("show"); });
+
+function loadAdminUsers(){
+  var body = document.getElementById("adminUsersBody");
+  body.innerHTML = "<tr><td colspan='8'>Loading…</td></tr>";
+  db.collection("users").get().then(function(snap){
+    var rows = [];
+    snap.forEach(function(doc){ rows.push(Object.assign({uid:doc.id}, doc.data())); });
+    rows.sort(function(a,b){ return (a.name||"").localeCompare(b.name||""); });
+    body.innerHTML = rows.map(function(u){
+      /* roleV2 is the one true source now -- shown here with the EXACT same
+         label as the Suite's central Admin Controls panel, so this panel can
+         never again disagree with it for the same account. Role changes
+         (and, with them, gallery upload access) are made from the Suite only. */
+      var uRoleV2 = u.roleV2 || "viewer";
+      var uRoleKey = (uRoleV2==="super_admin") ? "gr_role_super_admin"
+                   : (uRoleV2==="admin") ? "gr_role_admin"
+                   : (uRoleV2==="data_entry") ? "gr_role_data_entry"
+                   : "gr_role_viewer";
+      var initial = (u.name||"?").trim().charAt(0).toUpperCase() || "?";
+      var avatarHtml = u.photoURL
+        ? "<img src='"+esc(u.photoURL)+"' alt='' style='width:32px;height:32px;border-radius:50%;object-fit:cover;display:block;'>"
+        : "<span style='display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:var(--navy,#1F4E78);color:#fff;font-size:13px;font-weight:600;'>"+esc(initial)+"</span>";
+      return "<tr data-uid='"+esc(u.uid)+"'>"+
+        "<td>"+avatarHtml+"</td>"+
+        "<td>"+esc(u.name)+"</td>"+
+        "<td>"+esc(u.designation)+"</td>"+
+        "<td>"+esc(u.mobile)+"</td>"+
+        "<td>"+esc(u.cnic)+"</td>"+
+        "<td>"+esc(u.email)+"</td>"+
+        "<td>"+esc(t(uRoleKey))+"</td>"+
+        "<td><a href='https://cmpofficepgp.org/camp-office-suite/' target='_blank' rel='noopener'>"+esc(t("admin_changeInSuite"))+"</a></td>"+
+        "</tr>";
+    }).join("") || "<tr><td colspan='8'>No accounts yet.</td></tr>";
+  }).catch(function(err){
+    body.innerHTML = "<tr><td colspan='8'>Could not load: "+esc(err.message)+"</td></tr>";
+  });
+}
+
+  /* ================= Shared sidebar / mobile-drawer interactivity ================= */
+  (function(){
+    var sidebarEl = document.getElementById('sidebar');
+    var backdrop = document.getElementById('sidebarBackdrop');
+    var mobileBtn = document.getElementById('mobileMenuBtn');
+    if(mobileBtn) mobileBtn.addEventListener('click', function(){
+      sidebarEl.classList.add('mobile-open'); backdrop.classList.add('show');
+    });
+    if(backdrop) backdrop.addEventListener('click', function(){
+      sidebarEl.classList.remove('mobile-open'); backdrop.classList.remove('show');
+    });
+    document.querySelectorAll('.nav-group-head').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        document.getElementById(btn.dataset.group).classList.toggle('open');
+      });
+    });
+    document.querySelectorAll('.sidebar .nav-item:not(.disabled), .sidebar .nav-subitem').forEach(function(el){
+      el.addEventListener('click', function(){
+        if(window.innerWidth <= 960){ sidebarEl.classList.remove('mobile-open'); backdrop.classList.remove('show'); }
+      });
+    });
+  })();
+</script>
+    </div><!-- /.main-col -->
+  </div><!-- /.app-shell -->
+<!-- ===== Super Admin Security PIN Gate ===== -->
+<div id="spinGateOverlay" style="display:none; position:fixed; inset:0; background:rgba(20,30,40,.55); z-index:99999; align-items:center; justify-content:center; padding:16px;">
+  <div style="background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); padding:24px; max-width:340px; width:100%; direction:rtl; font-family:inherit;">
+    <div id="spinGateTitle" style="font-size:17px; font-weight:700; color:var(--text); margin-bottom:6px;"></div>
+    <div id="spinGateSub" style="font-size:13px; color:var(--muted); margin-bottom:14px; line-height:1.5;"></div>
+    <input type="text" inputmode="numeric" autocomplete="one-time-code" id="spinGateInput1" placeholder="6 ہندسوں کا کوڈ" style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid var(--border-strong); border-radius:6px; font-size:18px; margin-bottom:10px; text-align:center; letter-spacing:6px;">
+    <div id="spinGateError" style="color:var(--danger); font-size:13px; min-height:18px; margin-bottom:8px;"></div>
+    <button type="button" id="spinGateBtn" style="width:100%; background:var(--navy); color:#fff; border:1px solid var(--navy); padding:10px; border-radius:6px; font-size:15px; font-weight:600; cursor:pointer;">تصدیق کریں</button>
+    <div style="text-align:center; margin-top:10px; display:flex; align-items:center; justify-content:space-between; gap:10px;">
+      <button type="button" id="spinGateResend" style="background:none; border:none; color:var(--muted); font-size:12px; text-decoration:underline; cursor:pointer; padding:0;">کوڈ دوبارہ بھیجیں</button>
+      <a href="#" id="spinGateSignOut" style="font-size:12px; color:var(--muted); text-decoration:underline;">یہ میں نہیں ہوں — سائن آؤٹ کریں</a>
+    </div>
+  </div>
+</div>
+</body>
+</html>
