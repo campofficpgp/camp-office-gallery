@@ -22,7 +22,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@400;700&family=Merriweather:wght@400;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-check-compat.js"></script><script src="/app-check.js"></script>
 <!-- Sends the super-admin security code by email (see "Super Admin Email OTP Gate" below) -->
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <style>
@@ -297,6 +297,8 @@ html,body{overflow-x:hidden;}
 <meta name="theme-color" content="#17294a">
 <meta name="mobile-web-app-capable" content="yes">
 <script src="/pwa.js" defer></script>
+<script>window.CAMP_REQUIRE_APPROVED=true;</script>
+<script src="/auth-guard.js" defer></script>
 </head>
 <body>
 
@@ -341,8 +343,8 @@ html,body{overflow-x:hidden;}
     <div class="field"><label data-i18n="auth_password">Password</label><input type="password" id="login_password"></div>
     <button class="btn" id="loginBtn" style="width:100%;" data-i18n="auth_signin">Sign in</button>
     <div class="auth-error" id="loginError"></div>
-    <button class="btn ghost" id="goToSignupBtn" style="width:100%;margin-top:10px;" data-i18n="auth_createNewAccount">Create a new account</button>
     <div style="text-align:center;margin-top:10px;"><a href="#" id="forgotPasswordLink" style="font-size:12.5px;color:#1F4E78;text-decoration:underline;" data-i18n="auth_forgotPassword">Forgot password?</a></div>
+    <div style="text-align:center;margin-top:8px;"><a href="https://cmpofficepgp.org/camp-office-suite/#request" style="font-size:12.5px;color:#1F4E78;font-weight:700;text-decoration:underline;">اکاؤنٹ نہیں ہے؟ درخواست دیں / Request an account</a></div>
   </div>
 </div>
 
@@ -673,6 +675,7 @@ function spinSendCode(uid, email){
 }
 var SPIN_GATE_OPEN_FOR = null;
 function spinGate(uid, data, proceedFn){
+  proceedFn(); return; /* 12 Oct 2026: email-code gate switched off, same as the other systems */
   if(!data || data.roleV2 !== "super_admin"){ proceedFn(); return; }
   if(spinIsVerified(uid)){ proceedFn(); return; }
   if(SPIN_GATE_OPEN_FOR === uid){ return; } /* already open for this uid -- ignore re-entrant snapshot fires */
@@ -1056,7 +1059,7 @@ function showApp(){
   var curTheme = document.documentElement.getAttribute("data-theme") || "navy";
   var themeSel = document.getElementById("themeSwitcher"); if(themeSel) themeSel.value = curTheme;
 }
-document.getElementById("goToSignupBtn").addEventListener("click", showSetup);
+/* sign-up removed (12 Oct 2026): accounts are created only by the office administrator, in the portal */
 document.getElementById("forgotPasswordLink").addEventListener("click", function(e){{
   e.preventDefault();
   var email = document.getElementById("login_username").value.trim();
@@ -1112,7 +1115,10 @@ document.getElementById("loginBtn").addEventListener("click", function(){
   if(!email || !pass){ errEl.textContent = "Please enter your email and password."; return; }
   btn.disabled = true; btn.textContent = t("auth_signingIn"); /* visible feedback so the button never looks stuck/frozen */
   auth.signInWithEmailAndPassword(email, pass).catch(function(err){
-    errEl.textContent = err.message;
+    var c = (err && err.code) || "";
+    errEl.textContent = /invalid-credential|wrong-password|user-not-found|invalid-login/.test(c) ? "ای میل یا پاس ورڈ درست نہیں / Email or password is incorrect." :
+      (c === "auth/too-many-requests" ? "بہت زیادہ کوششیں۔ کچھ دیر بعد دوبارہ کوشش کریں / Too many attempts. Please wait and try again." :
+      (c === "auth/network-request-failed" ? "انٹرنیٹ کنکشن چیک کریں / Check your internet connection." : "لاگ اِن نہیں ہو سکا / Could not sign in."));
     btn.disabled = false; btn.textContent = t("auth_signin");
   });
 });
