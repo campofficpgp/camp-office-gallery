@@ -335,6 +335,97 @@ html,body{overflow-x:hidden;}
 <script>window.CAMP_REQUIRE_APPROVED=true;</script>
 <script src="/auth-guard.js" defer></script>
 <script src="/logo-control.js?v=3" defer></script>
+<style id="gal-pro-skin">
+/* =====================================================================
+   CAMP OFFICE GALLERY — PROFESSIONAL SKIN (2026-10-28), same look as Record Section / Case Notice / Bill Register.
+   Look & layout only (screen only). Every id / handler / rule is untouched; print is not touched.
+   ===================================================================== */
+@media screen{
+:root{
+  --gl-head:var(--navy-dark);
+  --gl-radius:10px;
+  --gl-ring:0 0 0 3px color-mix(in srgb,var(--navy) 18%,transparent);
+  --gl-shadow:0 1px 2px rgba(16,32,52,.06),0 2px 8px rgba(16,32,52,.05);
+}
+@supports (overflow:clip){ html,body{ overflow-x:clip !important; } }
+[data-theme="night"]{ --gl-head:#e6e8ef; }
+body{ -webkit-font-smoothing:antialiased; }
+main h2,main h3,.topbar h1{ font-family:"Segoe UI",system-ui,-apple-system,"Noto Sans",Arial,sans-serif; letter-spacing:-.005em; }
+
+/* top bar : slim, calm */
+.topbar{ padding:9px 20px !important; min-height:52px; background:linear-gradient(135deg,var(--navy-dark),var(--navy)) !important; border-bottom:2px solid var(--amber) !important; gap:8px 14px !important; }
+.topbar h1{ font-size:15px !important; font-weight:600; letter-spacing:.01em; }
+.topbar .sub{ display:none; }
+.topbar{ justify-content:flex-start !important; }
+.topbar .userbar{ margin-inline-start:auto; }
+.topbar > div:not(.userbar) > img{ height:30px !important; }
+.topbar .userbar{ gap:6px 8px !important; font-size:12.5px; }
+.topbar .userbar select{ height:32px; padding:0 8px; border-radius:8px; font-size:12.5px; }
+.topbar .userbar .btn.small{ height:32px; padding:0 11px !important; border-radius:8px !important; display:inline-flex; align-items:center; gap:6px; font-weight:600; font-size:12.5px !important; background:rgba(255,255,255,.10); }
+.topbar .userbar .btn.small:hover{ background:rgba(255,255,255,.22); }
+.topbar .userbar .role-chip{ padding:3px 11px; font-size:11px; }
+.topbar .userbar #whoAmI{ white-space:nowrap; }
+.topbar .topbar-logo-sm{ height:26px !important; }
+
+/* page area */
+main{ padding:22px 26px 70px !important; max-width:1400px !important; }
+.toolbar{
+  padding:12px 16px; margin-bottom:18px !important; gap:10px !important;
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--gl-radius); box-shadow:var(--gl-shadow);
+}
+.toolbar .count-chip{ margin-left:auto; }
+body.lang-ur .toolbar .count-chip{ margin-left:0; margin-right:auto; }
+.guest-banner{ border-radius:8px !important; border-left:4px solid var(--amber) !important; }
+
+/* buttons (inside the page, not the pop-up windows' own rules) */
+main .btn{
+  min-height:38px; padding:8px 18px !important; border-radius:8px !important; font-size:13.5px !important; font-weight:600; letter-spacing:.01em;
+  display:inline-flex; align-items:center; justify-content:center; gap:6px;
+  box-shadow:0 1px 2px rgba(16,32,52,.12); transition:background .15s,box-shadow .15s,transform .05s;
+}
+main .btn:active{ transform:translateY(1px); }
+main .btn.ghost{ box-shadow:none; background:var(--surface) !important; color:var(--gl-head) !important; border:1px solid var(--border-strong) !important; }
+main .btn.ghost:hover{ background:var(--navy-tint) !important; border-color:var(--navy) !important; }
+main .btn:focus-visible,.topbar .btn:focus-visible{ box-shadow:var(--gl-ring); outline:none; }
+.count-chip{ padding:4px 12px !important; font-size:12px !important; background:var(--navy-tint); color:var(--gl-head); border:1px solid var(--border); }
+
+/* photos */
+.gallery-grid{ gap:14px !important; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)) !important; }
+.gphoto{ border-radius:var(--gl-radius) !important; border:1px solid var(--border) !important; box-shadow:var(--gl-shadow) !important; transition:transform .15s, box-shadow .15s; }
+.gphoto:hover{ transform:translateY(-2px); box-shadow:0 4px 14px rgba(16,32,52,.18) !important; }
+.empty-state{ padding:40px 16px; border:1px dashed var(--border-strong); border-radius:var(--gl-radius); background:var(--surface); color:var(--muted); text-align:center; }
+
+/* pop-up windows (upload, users, viewer) */
+.modal{ border-radius:12px !important; box-shadow:0 12px 40px rgba(10,20,30,.35) !important; }
+.modal h3{ font-family:"Segoe UI",system-ui,-apple-system,"Noto Sans",Arial,sans-serif; letter-spacing:-.005em; }
+.modal input,.modal select,.modal textarea{ border-radius:8px !important; min-height:38px; border:1px solid var(--border-strong) !important; }
+.modal input:focus,.modal select:focus,.modal textarea:focus{ border-color:var(--navy) !important; box-shadow:var(--gl-ring) !important; outline:none; }
+.modal .btn{ border-radius:8px !important; font-weight:600; }
+
+/* big photo in the viewer: keep the buttons below it on screen */
+.viewer-img{ max-height:62vh; width:auto; max-width:100%; object-fit:contain; margin:0 auto 14px; display:block; }
+
+/* night mode: readable buttons */
+[data-theme="night"] main .btn:not(.ghost):not(.danger),[data-theme="night"] .modal .btn:not(.ghost):not(.danger){ background:var(--amber) !important; color:#1b1b1b !important; border-color:var(--amber) !important; }
+[data-theme="night"] main .btn:not(.ghost):not(.danger):hover{ background:#e2b455 !important; }
+[data-theme="night"] .count-chip{ color:var(--text); }
+
+@media (max-width:960px){ main{ padding:18px 16px 70px !important; } }
+@media (max-width:640px){
+  .topbar{ padding:8px 12px !important; min-height:48px; }
+  .topbar h1{ font-size:13px !important; }
+  .topbar > div:not(.userbar) > img{ height:26px !important; }
+  .topbar .userbar{ flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; width:100%; padding-bottom:2px; }
+  .topbar .userbar::-webkit-scrollbar{ display:none; }
+  .topbar .userbar > *{ flex:none; }
+  main{ padding:14px 10px 84px !important; }
+  .toolbar{ padding:10px 12px; }
+  main .btn{ min-height:44px; }
+  .gallery-grid{ grid-template-columns:repeat(2,minmax(0,1fr)) !important; gap:10px !important; }
+}
+}
+</style>
+
 </head>
 <body>
 
