@@ -81,6 +81,41 @@ html,body{overflow-x:hidden;}
     --text:#1E2A2A; --muted:#54696A;
     --shadow:0 1px 2px rgba(7,87,83,0.08), 0 1px 1px rgba(7,87,83,0.04);
   }
+  [data-theme="night"]{
+    --navy:#1c2436; --navy-dark:#12141c; --navy-tint:#232838;
+    --amber:#d4a13d; --amber-tint:#2a2416;
+    --bg:#12141c; --surface:#1c2030; --border:#2a2f42; --border-strong:#3a3f55;
+    --text:#e6e8ef; --muted:#8b93ab;
+    --shadow:0 1px 2px rgba(0,0,0,0.4), 0 1px 1px rgba(0,0,0,0.3);
+  }
+  [data-theme="sepia"]{
+    --navy:#6b4a26; --navy-dark:#4a3319; --navy-tint:#f4ecd8;
+    --amber:#8a5a2b; --amber-tint:#efe4c8;
+    --bg:#f4ecd8; --surface:#efe4c8; --border:#e2d3ac; --border-strong:#cbb98a;
+    --text:#4a3b28; --muted:#7d6b4f;
+    --shadow:0 1px 2px rgba(74,51,25,0.12), 0 1px 1px rgba(74,51,25,0.08);
+  }
+  [data-theme="slate"]{
+    --navy:#3b4758; --navy-dark:#2a323f; --navy-tint:#eef1f4;
+    --amber:#a68b5b; --amber-tint:#eef1f4;
+    --bg:#eef1f4; --surface:#ffffff; --border:#dde3ea; --border-strong:#c3ccd6;
+    --text:#2e3440; --muted:#6d7787;
+    --shadow:0 1px 2px rgba(46,52,64,0.08), 0 1px 1px rgba(46,52,64,0.04);
+  }
+  [data-theme="ocean"]{
+    --navy:#1670a0; --navy-dark:#0f4a6e; --navy-tint:#EAF4FA;
+    --amber:#c9852a; --amber-tint:#faf0dd;
+    --bg:#F2F8FB; --surface:#FFFFFF; --border:#D8E9F0; --border-strong:#B6D8E6;
+    --text:#1A3444; --muted:#5A7E8F;
+    --shadow:0 1px 2px rgba(15,74,110,0.08), 0 1px 1px rgba(15,74,110,0.04);
+  }
+  [data-theme="contrast"]{
+    --navy:#111111; --navy-dark:#000000; --navy-tint:#f5f5f5;
+    --amber:#8a4b00; --amber-tint:#fff3d6;
+    --bg:#fafafa; --surface:#ffffff; --border:#1a1a1a; --border-strong:#000000;
+    --text:#0a0a0a; --muted:#2e2e2e;
+    --shadow:0 1px 2px rgba(0,0,0,0.25), 0 1px 1px rgba(0,0,0,0.15);
+  }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
   body{
@@ -398,6 +433,11 @@ html,body{overflow-x:hidden;}
         <option value="green">سرکاری سبز / Green</option>
         <option value="ivory">کاغذی سفید / Ivory</option>
         <option value="teal">جدید ٹیل / Teal</option>
+        <option value="sepia">گرم بھورا / Sepia</option>
+        <option value="slate">نرم خاکستری 🩶 / Soft Slate</option>
+        <option value="ocean">سمندری نیلا 🌊 / Ocean</option>
+        <option value="contrast">ہائی کنٹراسٹ / High Contrast</option>
+        <option value="night">تاریک موڈ 🌙 / Night</option>
       </select>
       <span id="whoAmI"></span>
       <span class="role-chip" id="roleChip"></span>
@@ -753,7 +793,7 @@ var CLOUDINARY_CLOUD_NAME = "rjsudteo";
 var CLOUDINARY_UPLOAD_PRESET = "t8euf8jm";
 
 /* ================= THEME (per-user; follows the user's login across every camp-office system) ================= */
-var THEME_NAMES = ["navy","green","ivory","teal"];
+var THEME_NAMES = ["navy","green","ivory","teal","sepia","slate","ocean","contrast","night"];
 function applyTheme(name){
   if(THEME_NAMES.indexOf(name)===-1) name = "navy";
   document.documentElement.setAttribute("data-theme", name);
