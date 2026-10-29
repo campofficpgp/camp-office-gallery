@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Camp Office Gallery</title>
+<title>Gallery</title>
 <link rel="icon" href="favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
@@ -436,7 +436,7 @@ main .btn:focus-visible,.topbar .btn:focus-visible{ box-shadow:var(--gl-ring); o
     <h2 data-i18n="auth_createAccount">Create your account</h2>
     <div class="auth-sub" data-i18n="auth_newAccountsNote">New accounts start as "Pending" (view-only). An existing Administrator must approve you afterwards before you can upload photos.</div>
     <div class="field"><label data-i18n="lbl_name">Full name</label><input type="text" id="setup_name" placeholder="e.g. Iftikhar Ahmed"></div>
-    <div class="field"><label data-i18n="lbl_designation">Designation</label><input type="text" id="setup_designation" placeholder="e.g. Junior Clerk, Camp Office Prosecutor General Punjab"></div>
+    <div class="field"><label data-i18n="lbl_designation">Designation</label><input type="text" id="setup_designation" placeholder="e.g. Junior Clerk"></div>
     <div class="field"><label data-i18n="lbl_mobile">Mobile number (optional)</label><input type="tel" id="setup_mobile" placeholder="e.g. 0300-1234567"></div>
     <div class="field"><label data-i18n="lbl_cnic">CNIC number</label><input type="text" id="setup_cnic" placeholder="e.g. 12345-1234567-1"></div>
     <div class="field">
@@ -465,7 +465,7 @@ main .btn:focus-visible,.topbar .btn:focus-visible{ box-shadow:var(--gl-ring); o
   <div class="auth-card">
     <img src="https://cmpofficepgp.org/camp-office-suite/logo-punjab-govt.png" alt="Government of the Punjab" style="height:44px;width:auto;display:block;margin:0 auto 10px;">
     <h2 data-i18n="auth_signin">Sign in</h2>
-    <div class="auth-sub" data-i18n="app_subtitle">Camp Office Gallery &amp; Staff Directory</div>
+    <div class="auth-sub" data-i18n="app_subtitle">Gallery &amp; Staff Directory</div>
     <div class="field"><label data-i18n="auth_email">Email</label><input type="email" id="login_username"></div>
     <div class="field"><label data-i18n="auth_password">Password</label><input type="password" id="login_password"></div>
     <button class="btn" id="loginBtn" style="width:100%;" data-i18n="auth_signin">Sign in</button>
@@ -481,7 +481,7 @@ main .btn:focus-visible,.topbar .btn:focus-visible{ box-shadow:var(--gl-ring); o
     <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-head">
-        <div class="sidebar-brand"><img src="https://cmpofficepgp.org/camp-office-suite/logo-punjab-govt.png" alt="" style="height:24px;width:auto;"> <span>Camp Office</span></div>
+        <div class="sidebar-brand"><img src="https://cmpofficepgp.org/camp-office-suite/logo-punjab-govt.png" alt="" style="height:24px;width:auto;"> <span></span></div>
         <button class="sidebar-collapse-btn" id="sidebarCollapseBtn" title="Collapse">◧</button>
       </div>
       <nav class="sidebar-nav">
@@ -513,8 +513,8 @@ main .btn:focus-visible,.topbar .btn:focus-visible{ box-shadow:var(--gl-ring); o
     <div style="display:flex;align-items:center;gap:10px;">
       <img src="https://cmpofficepgp.org/camp-office-suite/logo-punjab-govt.png" alt="Government of the Punjab" style="height:38px;width:auto;flex:none;">
       <div>
-        <h1 data-i18n="app_title">Camp Office Gallery</h1>
-        <div class="sub" data-i18n="app_subtitle2">Camp Office Prosecutor General Punjab, Supreme Court of Pakistan, Islamabad</div>
+        <h1 data-i18n="app_title">Gallery</h1>
+        <div class="sub" data-i18n="app_subtitle2"></div>
       </div>
     </div>
     <div class="userbar">
@@ -553,8 +553,8 @@ main .btn:focus-visible,.topbar .btn:focus-visible{ box-shadow:var(--gl-ring); o
     <div class="empty-state" id="emptyState" style="display:none;" data-i18n="gallery_empty">No photos yet — be the first to upload one.</div>
   </main>
 
-  <footer class="appfoot" data-i18n="app_footer">Camp Office Gallery — every photo records who uploaded it and when.</footer>
-<div class="appfoot-copyright" style="text-align:center;font-size:11px;color:#8aa0b3;padding:6px 10px 14px;">© Iftikhar Ahmed — Camp Office, Prosecutor General Punjab, Supreme Court of Pakistan, Islamabad &nbsp;|&nbsp; © افتخار احمد — کیمپ آفس، پراسیکیوٹر جنرل پنجاب، سپریم کورٹ آف پاکستان، اسلام آباد</div>
+  <footer class="appfoot" data-i18n="app_footer">Gallery — every photo records who uploaded it and when.</footer>
+<div class="appfoot-copyright" style="text-align:center;font-size:11px;color:#8aa0b3;padding:6px 10px 14px;">© Iftikhar Ahmed &nbsp;|&nbsp; © افتخار احمد</div>
 
   <button id="chatToggleBtn" title="Team Chat">💬<span class="chat-badge" id="chatBadge" style="display:none;">0</span></button>
   <div id="chatPanel">
@@ -939,15 +939,15 @@ var I18N_UI = {
     auth_yourEmail:"Your email", auth_password:"Password", auth_confirmPassword:"Confirm password",
     auth_createAccountBtn:"Create account", auth_backToSignin:"Back to sign in",
     auth_warnText:"Photos and profile data are stored online in this system's shared Firebase database, visible only to signed-in staff.",
-    auth_signin:"Sign in", auth_signingIn:"Signing in…", app_subtitle:"Camp Office Gallery & Staff Directory",
+    auth_signin:"Sign in", auth_signingIn:"Signing in…", app_subtitle:"Gallery & Staff Directory",
     auth_email:"Email", auth_createNewAccount:"Create a new account", auth_forgotPassword:"Forgot password?",
-    app_title:"Camp Office Gallery",
-    app_subtitle2:"Camp Office Prosecutor General Punjab, Supreme Court of Pakistan, Islamabad",
+    app_title:"Gallery",
+    app_subtitle2:"",
     btn_signout:"Sign out",
     guest_pendingNote:"You can view the gallery here. Uploading and managing photos is limited to the Super Admin account only.",
     btn_uploadPhoto:"Upload photo", btn_manageUsers:"Manage users",
     gallery_empty:"No photos yet — be the first to upload one.",
-    app_footer:"Camp Office Gallery — every photo records who uploaded it and when.",
+    app_footer:"Gallery — every photo records who uploaded it and when.",
     upload_title:"Upload a photo", upload_pickFile:"Choose image", upload_caption:"Caption (optional)",
     btn_cancel:"Cancel", btn_upload:"Upload", btn_close:"Close",
     admin_manageUsersTitle:"Manage staff accounts",
@@ -1018,15 +1018,15 @@ var I18N_UI = {
     auth_yourEmail:"آپ کا ای میل", auth_password:"پاسورڈ", auth_confirmPassword:"پاسورڈ دوبارہ لکھیں",
     auth_createAccountBtn:"اکاؤنٹ بنائیں", auth_backToSignin:"واپس سائن ان",
     auth_warnText:"تصاویر اور پروفائل ڈیٹا اس سسٹم کے مشترکہ Firebase ڈیٹابیس میں آن لائن محفوظ ہوتا ہے، صرف سائن ان عملہ ہی دیکھ سکتا ہے۔",
-    auth_signin:"سائن ان", auth_signingIn:"سائن اِن ہو رہا ہے…", app_subtitle:"کیمپ آفس گیلری اور اسٹاف ڈائریکٹری",
+    auth_signin:"سائن ان", auth_signingIn:"سائن اِن ہو رہا ہے…", app_subtitle:"گیلری اور اسٹاف ڈائریکٹری",
     auth_email:"ای میل", auth_createNewAccount:"نیا اکاؤنٹ بنائیں", auth_forgotPassword:"پاسورڈ بھول گئے؟",
-    app_title:"کیمپ آفس گیلری",
-    app_subtitle2:"کیمپ آفس پراسیکیوٹر جنرل پنجاب، سپریم کورٹ آف پاکستان، اسلام آباد",
+    app_title:"گیلری",
+    app_subtitle2:"",
     btn_signout:"سائن آؤٹ",
     guest_pendingNote:"آپ یہاں گیلری دیکھ سکتے ہیں۔ تصویر اپ لوڈ اور انتظام صرف Super Admin اکاؤنٹ کر سکتا ہے۔",
     btn_uploadPhoto:"تصویر اپ لوڈ کریں", btn_manageUsers:"صارفین کا انتظام",
     gallery_empty:"ابھی کوئی تصویر موجود نہیں — سب سے پہلے آپ اپ لوڈ کریں۔",
-    app_footer:"کیمپ آفس گیلری — ہر تصویر پر ریکارڈ رہتا ہے کہ کس نے اور کب اپ لوڈ کی۔",
+    app_footer:"گیلری — ہر تصویر پر ریکارڈ رہتا ہے کہ کس نے اور کب اپ لوڈ کی۔",
     upload_title:"تصویر اپ لوڈ کریں", upload_pickFile:"تصویر منتخب کریں", upload_caption:"کیپشن (اختیاری)",
     btn_cancel:"منسوخ", btn_upload:"اپ لوڈ کریں", btn_close:"بند کریں",
     admin_manageUsersTitle:"عملے کے اکاؤنٹس کا انتظام",
@@ -1058,7 +1058,7 @@ var I18N_UI = {
     help_admin_intro:"یہ صرف سب کا کردار دکھانے کے لیے ہے — یہ خود کسی کو گیلری اپ لوڈ کی اجازت نہیں دیتا، کیونکہ یہ اجازت صرف Super Admin کے پاس ہوتی ہے۔",
     help_admin_s1:"\"Manage users\" کھول کر ہر اس اسٹاف ممبر کو دیکھیں جس نے سائن اپ کیا ہے، اس کے نام، عہدے، موبائل، CNIC، ای میل، اور کردار کے ساتھ۔",
     help_admin_s2:"کسی نام کے سامنے \"سوٹ میں تبدیل کریں\" کھول کر سوٹ کے Admin Controls میں جائیں، جہاں کردار اصل میں تبدیل ہوتا ہے۔ گیلری اپ لوڈ/انتظام کی اجازت ہمیشہ Super Admin کردار کے ساتھ ہی آتی ہے — یہ یہاں الگ سے مقرر نہیں کی جاتی۔",
-    help_admin_s3:"کسی کی رسائی مکمل طور پر ختم کرنے کے لیے یہ سوٹ کے Admin Controls سے کریں — ان کا اکاؤنٹ تمام کیمپ آفس سسٹمز میں مشترکہ ہے، اسے صرف یہاں سے حذف نہیں کرنا چاہیے۔",
+    help_admin_s3:"کسی کی رسائی مکمل طور پر ختم کرنے کے لیے یہ سوٹ کے Admin Controls سے کریں — ان کا اکاؤنٹ تمام سسٹمز میں مشترکہ ہے، اسے صرف یہاں سے حذف نہیں کرنا چاہیے۔",
     help_faqTitle:"اکثر پوچھے جانے والے سوالات",
     help_faq1_q:"میں نے سائن اپ کر لیا لیکن \"تصویر اپ لوڈ کریں\" کا بٹن نظر نہیں آ رہا — کیوں؟",
     help_faq1_a:"اس گیلری میں اپ لوڈ صرف Super Admin اکاؤنٹ کر سکتا ہے۔ کسی اور کردار کو — عام Admin سمیت — یہاں اپ لوڈ کی اجازت نہیں دی جا سکتی۔",
